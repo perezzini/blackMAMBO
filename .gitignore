@@ -1,0 +1,13 @@
+*.uo
+*.ui
+*.o
+dtc
+lexer.sml
+parser.output
+parser.sig
+parser.sml
+.*.swp
+tags
+
+
+
