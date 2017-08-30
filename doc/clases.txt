@@ -1,0 +1,50 @@
+Tiger permite denotar dos tipos primitivos: int y string, y construir sinónimos, records y arreglos.
+Pero permite denotar valores de otros tipos (ej ()). Así que, internamente Tiger usará un sistema de
+tipos extendido.
+
+(Archivo en tigertips.sml)
+
+----------------------------
+
+Usaremos en tigerseman.sml dos entornos (tablas hash):
+	- tenv (type environment): [("int", TInt RW), ("string", TString)]
+	- venv (variable enviornment).
+
+----------------------------
+
+En tigergrm.y se encuentra la gramatica libre de contexto del lenguaje Tiger.
+
+----------------------------
+
+codigo fuente -> LEXER/PARSER -> ast (sin escapes) -> ESCAPES -> ast -> ANALISIS SEMANTICO
+
+LEXER/PARSER
+	- tigerlex.lex
+	- tigergrm.y
+	- tigerlin.sml
+
+AST:
+	- tigerabs.sml
+	- tigerpp.sml
+
+ESCAPES:
+	- tigerscap.sml/.sig
+
+TABLAS:
+	- tigertab.sml/.sig
+
+ANALISIS SEMANTICO:
+	- tigersres.sml
+	- tigertips.sml
+	- tigerseman.sig/.sml:
+		* trexp chequea tipos y comenta errores.
+
+tigermain.sml, donde se concatenan los módulos del compilador.
+
+--------------------------------------
+
+''a tipo polimórfico a que admite comparación
+
+--------------------------------------
+
+tigergrm.sml utiliza, entre otras cosas, tigerabs.sml.

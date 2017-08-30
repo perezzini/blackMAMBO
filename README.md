@@ -1,2 +1,0 @@
-# blackMAMBO
-A Tiger compiler
