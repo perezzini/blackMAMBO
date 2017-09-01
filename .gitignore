@@ -2,5 +2,6 @@
 *.ui
 *.o
 res
+doc/dudas.txt
 
 
