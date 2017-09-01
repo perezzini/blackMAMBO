@@ -4,15 +4,22 @@ struct
 open tigerabs
 open tigersres
 
+(* type expty = {exp: Translate.exp, ty: Tipo}. Usamos () por el momento, ya que no tenemos el módulo Translate *)
+(* expty: expression type *)
 type expty = {exp: unit, ty: Tipo}
 
+(* Environment de variables y funciones *)
 type venv = (string, EnvEntry) tigertab.Tabla
+
+(* Environment de declaraciones de tipos (por ej: type a = int) *)
 type tenv = (string, Tipo) tigertab.Tabla
 
+(* bindings de tipos de Tiger predefinidos *)
 val tab_tipos : (string, Tipo) Tabla = tabInserList(
 	tabNueva(),
 	[("int", TInt), ("string", TString)])
 
+(* bindings de funciones predefinidas de Tiger *)
 val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	tabNueva(),
 	[("print", Func{level=mainLevel, label="print",
@@ -65,6 +72,7 @@ fun tiposIguales (TRecord _) TNil = true
 		(* end *)raise Fail "No debería pasar! (2)"
   | tiposIguales a b = (a=b)
 
+(* Chequea tipos en el AST, y traduce expresiones en código intermedio *)
 fun transExp(venv, tenv) =
 	let fun error(s, p) = raise Fail ("Error -- línea "^Int.toString(p)^": "^s^"\n")
 		fun trexp(VarExp v) = trvar(v)
