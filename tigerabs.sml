@@ -1,13 +1,17 @@
 structure tigerabs = 
 struct
 
+(* From Appendix: Tiger Language Reference Manual; Appel *)
+
 type symbol = string
 type pos = int
 
-datatype var = SimpleVar of symbol
-	| FieldVar of var * symbol
-	| SubscriptVar of var * exp
+(* VARIABLES AND EXPRESSIONS: LVALUES *)
+datatype var = SimpleVar of symbol (* lvalue -> id *)
+	| FieldVar of var * symbol (* lvalue -> lvalue . id *)
+	| SubscriptVar of var * exp (* lvalue -> lvalue [exp] *)
 
+(* VARIABLES AND EXPRESSIONS: EXPRESSIONS *)
 and exp = VarExp of var * pos
 	| UnitExp of pos
 	| NilExp of pos
@@ -26,15 +30,17 @@ and exp = VarExp of var * pos
 	| BreakExp of pos
 	| ArrayExp of {typ: symbol, size: exp, init: exp} * pos
 
+(* DECLARATIONS *)
 and dec = FunctionDec of ({name: symbol, params: field list,
-		result: symbol option, body: exp} * pos) list
+		result: symbol option, body: exp} * pos) list (* Functions *)
 	| VarDec of {name: symbol, escape: bool ref,
-		     typ: symbol option, init: exp} * pos
-	| TypeDec of ({name: symbol, ty: ty} * pos) list
+		     typ: symbol option, init: exp} * pos (* Variables *)
+	| TypeDec of ({name: symbol, ty: ty} * pos) list (* Data Types *)
 
 and ty = NameTy of symbol
 	| RecordTy of field list
 	| ArrayTy of symbol
+
 and oper = PlusOp | MinusOp | TimesOp | DivideOp
 	| EqOp | NeqOp | LtOp | LeOp | GtOp | GeOp
 
