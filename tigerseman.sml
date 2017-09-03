@@ -8,10 +8,12 @@ open tigersres
 (* expty: expression type *)
 type expty = {exp: unit, ty: Tipo}
 
-(* Environment de variables y funciones *)
+(* Environment de variables y funciones. Para cada identificador de variable debemos saber si es una variable 
+(Var) o una función (Func). Si es una variable,cuál es su tipo; y si es una función qué son sus argumemntos y 
+los tipos de retorno *)
 type venv = (string, EnvEntry) tigertab.Tabla
 
-(* Environment de declaraciones de tipos (por ej: type a = int) *)
+(* Environment de declaraciones de tipos (por ej: type a = int es un par ("a", TInt) en la tabla tenv) *)
 type tenv = (string, Tipo) tigertab.Tabla
 
 (* bindings de tipos de Tiger predefinidos *)
@@ -80,8 +82,31 @@ fun transExp(venv, tenv) =
 		| trexp(NilExp _)= {exp=(), ty=TNil}
 		| trexp(IntExp(i, _)) = {exp=(), ty=TInt}
 		| trexp(StringExp(s, _)) = {exp=(), ty=TString}
-		| trexp(CallExp({func, args}, nl)) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+		| trexp(CallExp({func = f, args}, nl)) =
+			let
+				(* Buscamos la función en venv, para extraer información: sólo necesitamos formals y result type *)
+				val (level, label, formals, result, extern) = case tabBusca(f, venv) of
+					SOME(Func{lvl, lbl, fmls, rslt, extrn}) => (lvl, lbl, fmls, rstl, extrn)
+					| SOME _ => error(f^": no es una función", nl)
+					| NONE => error(f^": no existe tal función", nl)
+
+				(* Ahora, debo comparar formals con args *)
+				fun comparar [] [] r = r
+					| comparar [] _ _= error(f^": toma demasiados argumentos", nl)
+					| comparar _ [] _ = error(f^": toma pocos argumentos", nl)
+					| comparar (t:tt) (a:aa) r = let
+						val {exp=ae', ty=te'} = trexp a
+						val _ = tiposIguales(t, te')
+						handle _ => error(f^": argumento de tipo incorrecto")
+					in
+						comparar tt aa r@[{exp=ae', ty=te'}]
+					end
+
+				val leargs = comparar formals args []
+				val leargs'= List.map #exp leargs (* sacamos código intermedio *)
+			in
+				{exp=(), ty=result}
+			end
 		| trexp(OpExp({left, oper=EqOp, right}, nl)) =
 			let
 				val {exp=_, ty=tyl} = trexp left
@@ -146,9 +171,24 @@ fun transExp(venv, tenv) =
 				val {exp, ty=tipo} = hd(rev lexti)
 			in	{ exp=(), ty=tipo } end
 		| trexp(AssignExp({var=SimpleVar s, exp}, nl)) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				(* Buscamos si existe la variable s en el entorno *)
+				val _ = case tabBusca(s, venv) of
+					SOME (Var{ty}) => ty
+					| _ => error(s^": variable inexistente", nl)
+
+				val {ty=tyexp, ...} = trexp exp
+				val {ty=tyvar, ...} = trvar (SimpleVar s)
+			in
+				if tiposIguales tyexp tyvar then {exp=(), ty=TUnit} else error("Asignación errónea entre "^s^" y "^exp, nl)
+			end
 		| trexp(AssignExp({var, exp}, nl)) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				val {ty=tyexp} = trexp exp
+				val {ty=tyval} = trvar var
+			in
+				if tiposIguales tyexp tyvar then {exp=(), ty=TUnit} else error("Asignación errónea entre "^s^" y "^exp, nl)
+			end
 		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
 			let val {exp=testexp, ty=tytest} = trexp test
 			    val {exp=thenexp, ty=tythen} = trexp then'
@@ -174,7 +214,26 @@ fun transExp(venv, tenv) =
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
 		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				let {ty=tylo, ...} = trexp lo
+				let {ty=tyhi, ...} = trexp hi
+				(* Chequeamos si lo y hi tienen tipo int *)
+				val _ = if (tipoReal tylo <> TInt orelse (tipoReal tyhi) <> TInt then error(lo^" o "^hi^" no son de tipo int", nl)
+				
+				(* Debemos chequear que lo < hi? Cómo lo hago? *)
+
+				let {ty=tyvar, ...} = trvar var
+				let _ = if tipoReal tyvar = TInt () else error(var^" debe ser de tipo int", nl)
+
+				(* Insertamos var en venv para que body pueda usarla *)
+				val _ = tabInserta(var, lo, venv)
+				val {ty=tybody} = trexp body
+				(* Chequeamos que la expresión body produce ningun valor *)
+				val _ = if tybody <> TUnit then error("El cuerpo de un for no puede devolver un valor", nl)
+
+			in
+				{exp=(), ty=TUnit}
+			end
 		| trexp(LetExp({decs, body}, _)) =
 			let
 				val (venv', tenv', _) = List.foldl (fn (d, (v, t, _)) => trdec(v, t) d) (venv, tenv, []) decs
@@ -183,21 +242,89 @@ fun transExp(venv, tenv) =
 				{exp=(), ty=tybody}
 			end
 		| trexp(BreakExp nl) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			{exp=(), ty=TUnit}
 		| trexp(ArrayExp({typ, size, init}, nl)) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				(* Veamos si type está declarado en tenv como tipo TArray *)
+				val typarr = case tabEsta(type, tenv) of
+					SOME (TArray(t, _)) => t
+					| SOME _ => error(typ^" no es de tipo Array", nl)
+					| _ => error("El tipo "^typ^" no existe", nl)
+
+				val {ty=tysize, ...} = trexp size
+				val {ty=tyinit, ...} = trexp init
+
+				(* size debe ser int *)
+				val _ = if tipoReal tysize = TInt then () else error(size^" debe ser de tipo int", nl)
+				(* init debe ser de tipo typ *)
+				val _ = if tiposIguales tysize typ then () else error(init^" debe ser de tipo "^typ^, nl)
+			in
+				{exp=(), ty=typ}
+			end
+
 		and trvar(SimpleVar s, nl) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				val sty = case tabBusca(s, tenv) of
+					SOME (Var{ty}) => ty
+					| _ => error(s^:" variable indefinida", nl)
+			in
+				{exp=(), ty=sty}
+			end
 		| trvar(FieldVar(v, s), nl) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				val {ty=tyv} = trvar v
+
+				(* tyv debe ser de tipo TRecord. Ademas debemos extraer la lista de fields *)
+				val rFields = case tyv of
+					TRecord l => l
+					| _ => error(v^": debe ser de tipo record", nl)
+
+				(* Debemos ver que el identifier, s, es un id de la lista de fields del record *)
+				val idTrFields = List.map (fn (s, tr, i) => 
+					s, tf) rFields
+				val tyId = case List.find (fn (str, tr) => 
+					if str=s then tr) of
+					SOME (str, tr) => !tr
+					| NONE => error(s^": no es un field del record "^v, nl)
+
+			in
+				{exp=(), ty=tyId}
+			end
 		| trvar(SubscriptVar(v, e), nl) =
-			{exp=(), ty=TUnit} (*COMPLETAR*)
+			let
+				{ty=tyv, ...} = trvar v
+				{ty=tye, ...} = trexp e
+			in
+				case tye of
+					TArray(t, _) => if tipoReal !t = TInt then {exp=(), ty=tyv} else error("El índice "^!t^" no es un entero", nl)
+					| _ => error(e^" no es un array", nl)
+			end
 
 		(* lo más difícil. Por lo tanto, para ir probando lo demás, colocar "ex" en transExp *)
 		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) = 
-			(venv, tenv, []) (*COMPLETAR*)
+			let
+				{ty=tyinit, ...} = trexp init
+
+				(* Aumento venv con nuevo binding *)
+				val venv' = tabInserta name (Var{ty=tyinit}) venv
+			in
+				(venv', tenv, [])
+			end
 		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},pos)) =
-			(venv, tenv, []) (*COMPLETAR*)
+			let
+				(* Debemos ver que el tipo de name y typ son de tipos equivalentes *)
+				val {ty=tyinit} = trexp init
+				val tys = case tabBusca s tenv of
+					SOME t => t
+					| NONE => error(s^": no existe tal tipo", nl)
+
+				val _ = if tiposIguales tyinit tys then () else error(name^" y "^s^" no son tipos comparables", nl)
+
+				(* Aumento venv *)
+				val venv' = tabInserta name (Var{ty=tys}) venv
+			in
+				(venv', tenv, [])
+			end
 		| trdec (venv,tenv) (FunctionDec fs) =
 			(venv, tenv, []) (*COMPLETAR*)
 		| trdec (venv,tenv) (TypeDec ts) =
