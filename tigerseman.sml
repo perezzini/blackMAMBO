@@ -4,6 +4,8 @@ struct
 open tigerabs
 open tigersres
 
+open tigertopsort
+
 (* type expty = {exp: Translate.exp, ty: Tipo}. Usamos () por el momento, ya que no tenemos el módulo Translate *)
 (* expty: expression type *)
 type expty = {exp: unit, ty: Tipo}
@@ -276,7 +278,7 @@ fun transExp(venv, tenv) =
 
 				(* tyv debe ser de tipo TRecord. Ademas debemos extraer la lista de fields *)
 				val rFields = case tyv of
-					TRecord l => l
+					TRecord (l, _) => l
 					| _ => error(v^": debe ser de tipo record", nl)
 
 				(* Debemos ver que el identifier, s, es un id de la lista de fields del record *)
@@ -325,10 +327,54 @@ fun transExp(venv, tenv) =
 			in
 				(venv', tenv, [])
 			end
+		| trdec (venv,tenv) (FunctionDec []) =
+			(venv, tenv, [])
 		| trdec (venv,tenv) (FunctionDec fs) =
-			(venv, tenv, []) (*COMPLETAR*)
-		| trdec (venv,tenv) (TypeDec ts) =
-			(venv, tenv, []) (*COMPLETAR*)
+			let
+				(* Busquemos si hay nombres de funciones repetidos en un mismo batch, ya que no se permite *)
+				fun reps [] = false
+					| reps (({name, ...}, nl) :: t) = if List.exist (fn ({name=x, ...}, nl') => 
+						x=name) t then true else reps t
+
+				val _ = if reps ldecs then error("trdec(FunctionDec): nombres de funciones repetidas en batch", nl) else ()
+
+				(* Insertar funciones en del batch como Func's, juntos con sus argumentos en forma de Var en venv, y 
+				analizar body *)
+				fun insertar (({name, params, result, body}, nl)::fss) venv =
+					let
+						val venv' = tabInserta name Func{formals=params, result=result} venv
+
+						fun insertarVar [] env = env
+							insertarVar ({name, ...} :: ff) env = case tabBusca s venv of
+								SOME tyname => tabInserta name Var{ty=tyname} (insertarVar ff env)
+								| NONE => error("trdec(FunctionDec): tipo de argumento no definido", nl)
+
+						let venv'' = insertarVar params venv'
+							
+					in
+						venv'
+					end
+
+			in
+				(insertar fs venv, tenv, [])
+			end
+		| trdec (venv,tenv) (TypeDec []) =
+			(venv, tenv, [])
+		| trdec (venv,tenv) (TypeDec ldecs) =
+			let
+				(* Busquemos si hay nombres de tipos repetidos en un mismo batch, ya que no se permite *)
+				fun reps [] = false
+					| reps (({name, ...}, nl) :: t) = if List.exist (fn ({name=x, ...}, nl') => 
+						x=name) t then true else reps t
+
+				val _ = if reps ldecs then error("trdec(TypeDec): nombres de tipos repetidos en batch", nl) else ()
+
+				val ldecs' = map #1 ldecs (* sacamos los nl *)
+				val tenv' = (tigertopsort.fijaTipos ldecs' tenv)
+				handle tigertopsort.Ciclo => error("trdec(TypeDec): ciclo(s) en batch", nl)
+			in
+				(venv, tenv', [])
+			end
 	in trexp end
 fun transProg ex =
 	(* ponemos la expresion (AST) en una función de Tiger*)
