@@ -1,0 +1,14 @@
+ENVIRONMENTS
+
+An environment is a set of bindings key -> value.
+We have two, 'cause one is not sufficient:
+	- type env: mapping from string to Tiger types. This is: tenv = (string, Tipo) tigertab.Tabla. Primitive 
+	types: int, string (all other types are either primitive types or constructed using records and arrays 
+	from other types). Since every "record type expression" creates a new record type, even if the fields are 
+	similar, we have a "unique" value to distinguish it.
+	- value env: mapping from string to environment-entry. This is: (string, EnvEntry) tigertab.Tabla; where 
+	EnvEntry is a variable (Var) or a function (Func) (for type-checking, we use "formals" and "result" only @ "Func")
+
+These are used during the type-checking phase. As types, variables, and functions are declared, the type-checker 
+augments the two environments; and they are consulted for each identifier that is found during processing of 
+expressions (type-checking, intermediate code generation).
