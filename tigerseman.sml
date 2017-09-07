@@ -6,7 +6,7 @@ open tigersres
 
 (* open tigerpp *)
 
-(* open tigertopsort *)
+(*open tigertopsort*)
 
 (* type expty = {exp: Translate.exp, ty: Tipo}. Usamos () por el momento, ya que no tenemos el módulo Translate *)
 (* expty: expression type *)
@@ -226,19 +226,17 @@ fun transExp(venv, tenv) =
 			end
 		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
 			let
+				(* Veamos que lo y hi tienen tipo TInt *)
 				val {ty=tylo, ...} = trexp lo
 				val {ty=tyhi, ...} = trexp hi
-				(* Chequeamos si lo y hi tienen tipo int *)
-				val _ = if (tipoReal tylo) <> TInt orelse (tipoReal tyhi) <> TInt then error("lo o hi no son de tipo int", nl)
-				
-				(* Debemos chequear que lo < hi? Cómo lo hago? *)
+				val _ = if tipoReal(tylo, tenv)=TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo entero", nl)
+			
+				val venv' = tabRInserta(var, VIntro, venv)
 
-				(* Insertamos var en venv para que body pueda usarla *)
-				val venv' = tabRInserta (var, VIntro, venv)
 				val {ty=tybody, ...} = transExp (venv', tenv) body
 
-				(* Chequeamos que la expresión body produce ningun valor *)
-				val _ = if not (tiposIguales tybody TUnit) then error("El cuerpo de un for no puede devolver un valor, debe ser TUnit", nl)
+				(* El tipo del body debe ser TUnit *)
+				val _ = if tiposIguales TUnit tybody then () else error("El tipo del body del for debe ser TUnit", nl)
 			in
 				{exp=(), ty=TUnit}
 			end
@@ -341,26 +339,26 @@ fun transExp(venv, tenv) =
 		| trdec (venv,tenv) (FunctionDec fs) =
 			let
 				(* Busquemos si hay nombres de funciones repetidos en un mismo batch, ya que no se permite *)
-				(*fun reps [] = false
+				fun reps [] = false
 					| reps (({name, ...}, nl) :: t) = if List.exists (fn ({name=x, ...}, nl') => 
-						x=name) t then true else reps t*)
+						x=name) t then true else reps t
 
-				(*val _ = if reps fs then raise Fail ("trdec(FunctionDec): nombres de funciones repetidas en batch") else ()*)
+				val _ = if reps fs then raise Fail ("trdec(FunctionDec): nombres de funciones repetidas en batch") else ()
 
 				(* Insertar funciones del batch, en el envioronment de funciones y variables *)
-				(*fun insertarFunciones [] env = env
+				fun insertarFunciones [] env = env
 					| insertarFunciones (({name, params, result, ...}, nl) :: fss) env =
 						let
 							val env' = tabRInserta (name, Func{formals=map #typ params, result=result, ...}, insertarFunciones fss env)						
 						in
 							env'
 						end
-*)
+						
 				(* Nuevo environment donde están definidas las nuevas funciones *)
-				(*venv' = insertarFunciones fs venv*)
+				venv' = insertarFunciones fs venv
 
 				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body *)
-				(*fun analizarBody params body env = 
+				fun analizarBody params body env = 
 					let
 						fun aux [] env = env
 							| aux ({name, typ, ...} :: ps) env = tabRInserta (name, Var{ty=typ}, aux ps env)
@@ -368,22 +366,22 @@ fun transExp(venv, tenv) =
 						val {ty=tybody, ...} = transExp ((aux params env), tenv) body 
 					in
 						tybody
-					end*)
+					end
 
 				(* Analizo todos los bodies de las funciones del batch con venv' *)
-				(*val functionTypes = List.map (fn {params, body, ...} => 
-					analizarBody params body venv') fs*)
+				val functionTypes = List.map (fn {params, body, ...} => 
+					analizarBody params body venv') fs
 
 				(* Los tipos que devuelven, por def, cada función del batch *)
-				(*val batchFunctionTypes = List.map (fn {result, ...} =>
-					result) fs*)
+				val batchFunctionTypes = List.map (fn {result, ...} =>
+					result) fs
 
 				(* NOTA: estoy suponiendo que ambas listas anteriores tienen la misma longitud *)
 
-				(*val _ = if listasTiposIguales functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de funciones analizadas no coinciden")*)
+				val _ = if listasTiposIguales functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de funciones analizadas no coinciden")
 
 			in
-				(venv, tenv, [])
+				(venv', tenv, [])
 			end
 		| trdec (venv,tenv) (TypeDec []) =
 			(venv, tenv, [])
@@ -396,7 +394,7 @@ fun transExp(venv, tenv) =
 
 				val _ = if reps ldecs then raise Fail ("trdec(TypeDec): nombres de tipos repetidos en batch") else ()
 
-				val ldecs' = map #1 ldecs (* sacamos los nl *)
+				val ldecs' = map #1 ldecs*) (* sacamos los nl *)
 				val tenv' = (tigertopsort.fijaTipos ldecs' tenv)
 				handle tigertopsort.Ciclo => raise Fail ("trdec(TypeDec): ciclo(s) en batch")
 			in
