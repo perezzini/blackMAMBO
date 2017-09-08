@@ -345,32 +345,65 @@ fun transExp(venv, tenv) =
 
 				val _ = if reps fs then raise Fail ("trdec(FunctionDec): nombres de funciones repetidas en batch") else ()
 
-				(* Insertar funciones del batch, en el envioronment de funciones y variables *)
+				(* Traduce lista de argumentos de una función en su verdadero tipo (de tipo Tipo), si es que está definido *)
+				fun traducirParams [] = []
+					| traducirParams ({typ=NameTy s, name, escape} :: pp) = 
+						(case tabBusca(s, tenv) of
+							SOME t => ({name=name, escape=(!escape), ty=t} :: traducirParams pp)
+							| NONE => raise Fail ("tredec(FunctionDec), traducirParams(): el parámetro de una función no está definido"))
+					| traducirParams _ = raise Fail ("trdec(FunctionDec), traducirParams(): no debería pasar, Tiger no acepta argumentos de funciones de tipo record o array")
+
+
+				(* Insertar funciones del batch en el environment de funciones y variables *)
 				fun insertarFunciones [] env = env
 					| insertarFunciones (({name, params, result, ...}, nl) :: fss) env =
 						let
-							val env' = tabRInserta (name, Func{formals=map #typ params, result=result, ...}, insertarFunciones fss env)						
+							(* Analizo que el tipo del resultado de una función esté definido *)
+							val resultType = case result of
+								NONE => TUnit
+								| SOME s => case tabBusca(s, tenv) of
+									SOME t => t
+									| _ => raise Fail ("trdec(FunctionDec), insertarFunciones(): tipo de retorno de función no existente")
+
+							val result = resultType
+
+							(* Analizo los tipos de los argumentos de la función, en busca de alguno no definido en tenv *)
+							val arguments = traducirParams params
+
+							(* Inserto funciones en environment *)
+							val env' = tabRInserta (name, 
+													Func{level=level,
+															label=label,
+															formals=map #ty arguments,
+															result=resultType,
+															extern=extern}, 
+													insertarFunciones fss env)						
 						in
 							env'
 						end
-						
+
 				(* Nuevo environment donde están definidas las nuevas funciones *)
-				venv' = insertarFunciones fs venv
+				venv' = insertarFunciones fs venv (* Este es el que debo retornar *)
+				venv'' = insertarFunciones fs venv (* Este es el que debo usar para analizar los bodies de las funciones del batch *)
+
+
+				fun agregarParams [] env = env
+					| agregarParams ({typ=NameTy s, ...} :: pp) env = (case tabBusca(s, tenv) of
+						SOME t => tabRInserta(s, Var{ty=t}, agregarParams pp env)
+						| _ => raise Fail ("trdec(FunctionDec), agregarParams(): se quiere agregar argumento de función con tipo indefinido"))
+					| agregarParams _ _ = raise Fail ("trdec(FunctionDec), agregarParams(): no debería pasar; Tiger no acepta argumentos de función con tipo array o record")
 
 				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body *)
 				fun analizarBody params body env = 
 					let
-						fun aux [] env = env
-							| aux ({name, typ, ...} :: ps) env = tabRInserta (name, Var{ty=typ}, aux ps env)
-
-						val {ty=tybody, ...} = transExp ((aux params env), tenv) body 
+						val {ty=tybody, ...} = transExp ((agregarParams params env), tenv) body 
 					in
 						tybody
 					end
 
 				(* Analizo todos los bodies de las funciones del batch con venv' *)
 				val functionTypes = List.map (fn {params, body, ...} => 
-					analizarBody params body venv') fs
+					analizarBody params body venv'') fs
 
 				(* Los tipos que devuelven, por def, cada función del batch *)
 				val batchFunctionTypes = List.map (fn {result, ...} =>
@@ -394,7 +427,7 @@ fun transExp(venv, tenv) =
 
 				val _ = if reps ldecs then raise Fail ("trdec(TypeDec): nombres de tipos repetidos en batch") else ()
 
-				val ldecs' = map #1 ldecs*) (* sacamos los nl *)
+				val ldecs' = map #1 ldecs (* sacamos los nl *)
 				val tenv' = (tigertopsort.fijaTipos ldecs' tenv)
 				handle tigertopsort.Ciclo => raise Fail ("trdec(TypeDec): ciclo(s) en batch")
 			in
