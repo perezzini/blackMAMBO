@@ -17,22 +17,29 @@ exception Ciclo
 St: Stack de no tratados.
 Res: resultado.  *)
 
+(* Sort topológico *)
 fun topsort P =
 	let	fun candidato E P =
 			List.filter (fn e => List.all((op<> rs e) o snd) P) E
+
 		fun tsort P [] Res = rev Res
 		| tsort [] St Res = rev(St @ Res)
 		| tsort P (St as (h::t)) Res =
 			let	val x = (hd(candidato St P)) handle Empty => raise Ciclo
-			in	tsort (P --- x) (St -- x) (x::Res) end
-	fun elementos lt =
-		List.foldr (fn((x, y), l) =>
-			let	val l1 = case List.find (op= rs x) l of
-							NONE => x::l | _ => l
-				val l2 = case List.find (op= rs y) l1 of
-							NONE => y::l1 | _ => l1
-			in	l2 end) [] lt
-	in	tsort P (elementos P) [] end
+			in	
+				tsort (P --- x) (St -- x) (x::Res) 
+			end
+
+		fun elementos lt =
+			List.foldr (fn((x, y), l) =>
+				let	val l1 = case List.find (op= rs x) l of
+								NONE => x::l | _ => l
+					val l2 = case List.find (op= rs y) l1 of
+								NONE => y::l1 | _ => l1
+				in	l2 end) [] lt
+	in	
+		tsort P (elementos P) [] 
+	end
 
 fun buscaArrRecords lt =
 	let	fun buscaRecs [] res = res
@@ -41,25 +48,36 @@ fun buscaArrRecords lt =
 				| genrecs({name, escape, typ=NameTy s}::tail) n =
 					(name, ref(TTipo s), n)::genrecs tail (n+1)
 				| genrecs _ _ = raise Fail "error interno 666+3"
-			in	buscaRecs t ((name, TRecord(genrecs lf 0, ref()))::res) end
+			in	
+				buscaRecs t ((name, TRecord(genrecs lf 0, ref()))::res) 
+			end
 		| buscaRecs({name, ty=ArrayTy ty}::t) res = buscaRecs t ((name, TArray(ref(TTipo ty), ref()))::res)
 		| buscaRecs(_::t) res = buscaRecs t res
-	in	buscaRecs lt [] end
+	in	
+		buscaRecs lt [] 
+	end
+
 fun genPares lt =
 	let
 		val lrecs = buscaArrRecords lt
 		fun genP [] res = res
-		| genP ({name, ty=NameTy s'}::t) res = (print("NameTy "^s'^"\n"); genP t ((s', name)::res)   )
+		(* | genP ({name, ty=NameTy s'}::t) res = (print("NameTy "^s'^"\n"); genP t ((s', name)::res)) *) (* Para debugging *)
+		| genP ({name, ty=NameTy s'}::t) res = genP t ((s', name)::res)
 		| genP ({name, ty=ArrayTy s'}::t) res = genP t ((s', name)::res)
 		| genP ({name, ty=RecordTy lf}::t) res = genP t res
-	in	genP lt [] end
+	in	
+		genP lt [] 
+	end
+
 fun procesa [] pares env _ = env: (string, Tipo) Tabla
 | procesa (sorted as (h::t)) (pares:{name:symbol, ty:ty} list) env recs =
 	let
 		fun filt h {name, ty = NameTy t} = h=t
 		| filt h {name, ty = ArrayTy t} = h=t
 		| filt h {name, ty = RecordTy lt} = List.exists (((NameTy h) ls op=) o #typ) lt
+
 		val (ps, ps') = List.partition (filt h) pares
+
 		val ttopt = case tabBusca(h, env) of
 					SOME t => SOME t
 					| _ =>
@@ -68,6 +86,7 @@ fun procesa [] pares env _ = env: (string, Tipo) Tabla
 								(tabRInserta(h, tr, env);
 								SOME tr) (* OJOOOOOOOOOOOOOOOO *)
 						| _ => raise Fail (h^" **no existe!!!")
+
 		val env' = case ttopt of
 					SOME tt =>
 						List.foldr
@@ -76,15 +95,22 @@ fun procesa [] pares env _ = env: (string, Tipo) Tabla
 								let val (k, v) =
 										case List.find((name ls op=) o #1) recs of
 										SOME x => x | _ => raise Fail "error 666+45"
-								in	tabRInserta(k, v , env') end
+								in	
+									tabRInserta(k, v , env') 
+								end
 							| ({name, ty=RecordTy s}, env') =>
 								let val (k, v) =
 										case List.find((name ls op=) o #1) recs of
 										SOME x => x | _ => raise Fail "error 666+46"
-								in	tabRInserta(k, v , env') end)
+								in	
+									tabRInserta(k, v , env') 
+								end)
 					 		env ps
 					| _ => env
-	in procesa t ps' env' recs end
+	in 
+		procesa t ps' env' recs 
+	end
+
 fun fijaNONE [] env = env
 | fijaNONE((name, TArray(ar as (ref(TTipo s)), u))::t) env =
 	(case tabBusca(s, env) of
@@ -95,11 +121,13 @@ fun fijaNONE [] env = env
 			(ar := tabSaca(t, env) handle _ => raise noExiste)
 		| busNONE _ = ()
 		val _ = List.app busNONE lf
-	in	fijaNONE t env end
+	in	
+		fijaNONE t env 
+	end
 | fijaNONE(_::t) env = fijaNONE t env
+
 fun agregarecs env [] = env
-| agregarecs env ((k, v)::t) =
-	agregarecs (tabRInserta(k, v, env)) t
+| agregarecs env ((k, v)::t) = agregarecs (tabRInserta(k, v, env)) t
 
 fun fijaTipos batch env =
 	let	val pares = genPares batch
@@ -108,6 +136,8 @@ fun fijaTipos batch env =
 		val env' = procesa orden batch env recs
 		val env'' = agregarecs env' recs
 		val env''' = fijaNONE (tabAList env'') env''
-val _ = tigermuestratipos.printTTipos(tabAList env'')
-	in	env''' end
+		(* val _ = tigermuestratipos.printTTipos(tabAList env'') *) (* Para debaugging *)
+	in	
+		env''' 
+	end
 end
