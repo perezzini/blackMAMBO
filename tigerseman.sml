@@ -4,10 +4,6 @@ struct
 open tigerabs
 open tigersres
 
-(* open tigerpp *)
-
-(*open tigertopsort*)
-
 (* type expty = {exp: Translate.exp, ty: Tipo}. Usamos () por el momento, ya que no tenemos el módulo Translate *)
 (* expty: expression type *)
 type expty = {exp: unit, ty: Tipo}
@@ -433,7 +429,9 @@ fun transExp(venv, tenv) =
 			in
 				(venv, tenv', [])
 			end
-	in trexp end
+	in 
+		trexp 
+	end
 fun transProg ex =
 	(* ponemos la expresion (AST) en una función de Tiger*)
 	let	val main =
