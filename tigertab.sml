@@ -17,8 +17,8 @@ fun tabEsta(s, t) =
 	case peek t s of
 	SOME _ => true
 	| NONE => false
-fun tabInserta(s, e, t) = let val t' = copy t in (peekInsert t' (s, e); t') end
-fun tabRInserta(s, e, t) = let val t' = copy t in (insert t' (s, e); t') end
+fun tabInserta(s, e, t) = let val t' = copy t in (peekInsert t' (s, e); t') end (* se usa cuando se quiere insertar un par sin importar si la clave existe o no, o si quiero sobreescribir *)
+fun tabRInserta(s, e, t) = let val t' = copy t in (insert t' (s, e); t') end (* se debe usar este... R de "reemplaza"*)
 fun tabBusca(s, t) = peek t s
 fun tabSaca(s, t) =
 	case tabBusca(s, t) of
