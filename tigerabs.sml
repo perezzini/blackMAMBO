@@ -37,9 +37,9 @@ and dec = FunctionDec of ({name: symbol, params: field list,
 		     typ: symbol option, init: exp} * pos (* Variables *)
 	| TypeDec of ({name: symbol, ty: ty} * pos) list (* Data Types *)
 
-and ty = NameTy of symbol
-	| RecordTy of field list
-	| ArrayTy of symbol
+and ty = NameTy of symbol (* tyId *)
+	| RecordTy of field list (* recTy *)
+	| ArrayTy of symbol (* arrTy *)
 
 and oper = PlusOp | MinusOp | TimesOp | DivideOp
 	| EqOp | NeqOp | LtOp | LeOp | GtOp | GeOp
