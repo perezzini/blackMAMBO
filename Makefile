@@ -1,5 +1,7 @@
 # Unix makefile for tigermain example
 
+# Cada vez que se agrega una dependencia, hacer "make depend"
+
 HOME=/usr/local/bin
 MOSMLHOME=${HOME}
 MOSMLTOOLS=camlrunm /usr/share/mosml/tools
