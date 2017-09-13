@@ -3,6 +3,7 @@ struct
 
 open tigerabs
 open tigersres
+open tigertemp
 
 (* type expty = {exp: Translate.exp, ty: Tipo}. Usamos () por el momento, ya que no tenemos el módulo Translate *)
 (* expty: expression type *)
@@ -162,7 +163,7 @@ fun transExp(venv, tenv) =
 				fun verificar [] [] = ()
 				  | verificar (c :: cs) [] = error("Faltan campos", nl)
 				  | verificar [] (c :: cs) = error("Sobran campos", nl)
-				  | verificar ((s, t) :: cs) ((sy, {exp, ty})::ds) =
+				  | verificar ((s, t, _) :: cs) ((sy, {exp, ty})::ds) =
 						if s<>sy then error("Error de campo", nl)
 						else if tiposIguales ty (!t) then verificar cs ds
 							 else error("Error de tipo del campo "^s, nl)
@@ -284,8 +285,8 @@ fun transExp(venv, tenv) =
 
 				(* Debemos ver que el identifier, s, es un id de la lista de fields del record. tyId es el tipo del 
 				identifier s en el record *)
-				val tyId = case List.find (fn (str, tyref) => str=str) recordFields of
-					SOME (str, tyref) => !tyref
+				val tyId = case List.find (fn (str, tyref, i) => str=str) recordFields of
+					SOME (str, tyref, i) => !tyref
 					| NONE => error(s^": no es un field del record v", nl)
 
 			in
@@ -332,7 +333,7 @@ fun transExp(venv, tenv) =
 			end
 		| trdec (venv,tenv) (FunctionDec []) =
 			(venv, tenv, [])
-		| trdec (venv,tenv) (FunctionDec fs) =
+		| trdec (venv, tenv) (FunctionDec fs) =
 			let
 				(* Busquemos si hay nombres de funciones repetidos en un mismo batch, ya que no se permite *)
 				fun reps [] = false
@@ -350,37 +351,38 @@ fun transExp(venv, tenv) =
 					| traducirParams _ = raise Fail ("trdec(FunctionDec), traducirParams(): no debería pasar, Tiger no acepta argumentos de funciones de tipo record o array")
 
 
+				fun symbolToTipo s = case s of
+					SOME s' => (case tabBusca(s', tenv) of
+						SOME t => t
+						| NONE => raise Fail ("trdec(FunctionDec): tipo de retorno de función no existente"))
+					| NONE => TUnit
+				
+
 				(* Insertar funciones del batch en el environment de funciones y variables *)
-				fun insertarFunciones [] env = env
+				fun insertarFunciones [] env : (string, EnvEntry) Tabla = env
 					| insertarFunciones (({name, params, result, ...}, nl) :: fss) env =
 						let
 							(* Analizo que el tipo del resultado de una función esté definido *)
-							val resultType = case result of
-								NONE => TUnit
-								| SOME s => case tabBusca(s, tenv) of
-									SOME t => t
-									| _ => raise Fail ("trdec(FunctionDec), insertarFunciones(): tipo de retorno de función no existente")
-
-							val result = resultType
+							val resultType = symbolToTipo result
 
 							(* Analizo los tipos de los argumentos de la función, en busca de alguno no definido en tenv *)
 							val arguments = traducirParams params
 
 							(* Inserto funciones en environment *)
 							val env' = tabRInserta (name, 
-													Func{level=level,
-															label=label,
+													Func{level=(),
+															label=name ^ newlabel(),
 															formals=map #ty arguments,
 															result=resultType,
-															extern=extern}, 
+															extern=false}, 
 													insertarFunciones fss env)						
 						in
 							env'
 						end
 
 				(* Nuevo environment donde están definidas las nuevas funciones *)
-				venv' = insertarFunciones fs venv (* Este es el que debo retornar *)
-				venv'' = insertarFunciones fs venv (* Este es el que debo usar para analizar los bodies de las funciones del batch *)
+				val venv' = insertarFunciones fs venv (* Este es el que debo retornar *)
+				val venv'' = insertarFunciones fs venv (* Este es el que debo usar para analizar los bodies de las funciones del batch *)
 
 
 				fun agregarParams [] env = env
@@ -398,12 +400,12 @@ fun transExp(venv, tenv) =
 					end
 
 				(* Analizo todos los bodies de las funciones del batch con venv' *)
-				val functionTypes = List.map (fn {params, body, ...} => 
+				val functionTypes = List.map (fn ({params, body, ...}, n) => 
 					analizarBody params body venv'') fs
 
-				(* Los tipos que devuelven, por def, cada función del batch *)
-				val batchFunctionTypes = List.map (fn {result, ...} =>
-					result) fs
+				(* Los tipos que devuelven, por def, cada función del batch, chequear result option *)
+				val batchFunctionTypes = List.map (fn ({result, ...}, n) =>
+					symbolToTipo result) fs
 
 				(* NOTA: estoy suponiendo que ambas listas anteriores tienen la misma longitud *)
 
@@ -436,8 +438,8 @@ fun transProg ex =
 	(* ponemos la expresion (AST) en una función de Tiger*)
 	let	val main =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
-								result=NONE, body=ex}, 0)]],
+								result=SOME ("string"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
-		val _ = transExp(tab_vars, tab_tipos) ex (* main *)
+		val _ = transExp(tab_vars, tab_tipos) ex (* ex *)
 	in	print "bien!\n" end
 end
