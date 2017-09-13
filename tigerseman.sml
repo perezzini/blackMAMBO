@@ -440,6 +440,6 @@ fun transProg ex =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
 								result=SOME ("string"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
-		val _ = transExp(tab_vars, tab_tipos) ex (* ex *)
-	in	print "bien!\n" end
+		val {ty=tyt, ...} = transExp(tab_vars, tab_tipos) ex (* main *)
+	in	tigermuestratipos.printTipo("final", tyt, tabAList(tab_tipos)) end
 end
