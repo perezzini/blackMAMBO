@@ -75,11 +75,6 @@ fun tiposIguales (TRecord _) TNil = true
 		(* end *)raise Fail "No debería pasar! (2)"
   | tiposIguales a b = (a=b)
 
-(* Chequea que dos listas de tipo Tipo (tigertips.sml) coincidan *)
-fun listasTiposIguales [] _ = raise Fail "listaTiposIguales: Listas de tipo Tipo de distinta longitud - no debería pasar"
-	| listasTiposIguales _ [] = raise Fail "listaTiposIguales: Listas de tipo Tipo de distinta longitud - no debería pasar"
-	| listasTiposIguales (x :: xx) (y :: yy) = if tiposIguales x y then listasTiposIguales xx yy else false
-
 (* Chequea tipos en el AST, y traduce expresiones en código intermedio *)
 fun transExp(venv, tenv) =
 	let fun error(s, p) = raise Fail ("Error -- línea "^Int.toString(p)^": "^s^"\n")
@@ -172,10 +167,14 @@ fun transExp(venv, tenv) =
 				{exp=(), ty=tyr}
 			end
 		| trexp(SeqExp(s, nl)) =
-			let	val lexti = map trexp s
+			let	
+				val _ = if List.length s < 2 then error("La secuencia tiene menos de dos expresiones", nl) else ()
+				val lexti = map trexp s
 				val exprs = map (fn{exp, ty} => exp) lexti
 				val {exp, ty=tipo} = hd(rev lexti)
-			in	{ exp=(), ty=tipo } end
+			in	
+				{ exp=(), ty=tipo } 
+			end
 		| trexp(AssignExp({var=SimpleVar s, exp}, nl)) =
 			let
 				(* Buscamos si existe la variable s en el entorno *)
@@ -188,14 +187,14 @@ fun transExp(venv, tenv) =
 				val {ty=tyexp, ...} = trexp exp
 				val {ty=tyvar, ...} = trvar (SimpleVar s, nl)
 			in
-				if tiposIguales tyexp tyvar then {exp=(), ty=TUnit} else error("Asignación errónea entre "^s^" y exp", nl)
+				if tiposIguales tyexp tyvar then {exp=(), ty=TUnit} else error("Error de tipos para la asignación de la variable "^s, nl)
 			end
 		| trexp(AssignExp({var, exp}, nl)) =
 			let
 				val {ty=tyexp, ...} = trexp exp
 				val {ty=tyvar, ...} = trvar (var, nl)
 			in
-				if tiposIguales tyexp tyvar then {exp=(), ty=TUnit} else error("Asignación errónea entre s y exp", nl)
+				if tiposIguales tyexp tyvar then {exp=(), ty=TUnit} else error("Error de tipos para asignación", nl)
 			end
 		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
 			let val {exp=testexp, ty=tytest} = trexp test
@@ -226,7 +225,7 @@ fun transExp(venv, tenv) =
 				(* Veamos que lo y hi tienen tipo TInt *)
 				val {ty=tylo, ...} = trexp lo
 				val {ty=tyhi, ...} = trexp hi
-				val _ = if tipoReal(tylo, tenv)=TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo entero", nl)
+				val _ = if tipoReal(tylo, tenv)=TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo TInt", nl)
 			
 				val venv' = tabRInserta(var, VIntro, venv)
 
@@ -258,9 +257,9 @@ fun transExp(venv, tenv) =
 				val {ty=tyinit, ...} = trexp init
 
 				(* size debe ser int *)
-				val _ = if tipoReal (tysize, tenv) = TInt then () else error("La expresión size debe ser de tipo int", nl)
+				val _ = if tipoReal (tysize, tenv) = TInt then () else error("El tamaño de un arreglo debe ser de tipo TInt", nl)
 				(* init debe ser de tipo typarr *)
-				val _ = if tiposIguales tysize typarr then () else error("La expresión init debe ser de tipo "^typ, nl)
+				val _ = if tiposIguales tysize typarr then () else error("El tipo de la inicialización del arreglo debe ser de tipo" ^typ, nl)
 			in
 				{exp=(), ty=typarr}
 			end
@@ -270,11 +269,13 @@ fun transExp(venv, tenv) =
 				val sty = case tabBusca(s, venv) of
 					SOME (Var{ty}) => ty
 					| SOME (VIntro) => TInt
-					| _ => error("s variable indefinida", nl)
+					| _ => error(s^": variable indefinida", nl)
 			in
 				{exp=(), ty=sty}
 			end
 		| trvar(FieldVar(v, s), nl) =
+			(* v debe tener tipo TRecord, y s debe ser un ID del record. El tipo resultado es el tipo del 
+			campo ID dentro del record *)
 			let
 				val {ty=tyv, ...} = trvar (v, nl)
 
@@ -293,17 +294,19 @@ fun transExp(venv, tenv) =
 				{exp=(), ty=tyId}
 			end
 		| trvar(SubscriptVar(v, e), nl) =
+			(* v debe ser de tipo TArray, y la expresión e debe ser de tipo TInt. El tipo resultado 
+			es el tipo del elemento del array *)
 			let
 				(* La variable v debe pertencer a venv y debe tener tipo Var{TArray(t, _)} *)
 				val {ty=tyv, ...} = trvar (v, nl)
 
 				(* Index expression *)
 				val {ty=tye, ...} = trexp e
-				val _ = if tipoReal (tye, tenv) = TInt then () else error("La expresión e no es de tipo int", nl)
+				val _ = if tipoReal (tye, tenv) = TInt then () else error("El índice no es de tipo TInt", nl)
 			in
 				case tyv of
 					TArray(t, _) => {exp=(), ty=(!t)}
-					| _ => error("v no es de tipo array", nl)
+					| _ => error("La variable no es de tipo TArray", nl)
 			end
 
 		(* lo más difícil. Por lo tanto, para ir probando lo demás, colocar "ex" en transExp *)
@@ -331,8 +334,6 @@ fun transExp(venv, tenv) =
 			in
 				(venv', tenv, [])
 			end
-		| trdec (venv,tenv) (FunctionDec []) =
-			(venv, tenv, [])
 		| trdec (venv, tenv) (FunctionDec fs) =
 			let
 				(* Busquemos si hay nombres de funciones repetidos en un mismo batch, ya que no se permite *)
@@ -354,11 +355,11 @@ fun transExp(venv, tenv) =
 				fun symbolToTipo s = case s of
 					SOME s' => (case tabBusca(s', tenv) of
 						SOME t => t
-						| NONE => raise Fail ("trdec(FunctionDec): tipo de retorno de función no existente"))
+						| NONE => raise Fail ("trdec(FunctionDec): "^s'^", tipo de retorno de función no existente"))
 					| NONE => TUnit
 				
 
-				(* Insertar funciones del batch en el environment de funciones y variables *)
+				(* Inserta funciones del batch en el environment de funciones y variables *)
 				fun insertarFunciones [] env : (string, EnvEntry) Tabla = env
 					| insertarFunciones (({name, params, result, ...}, nl) :: fss) env =
 						let
@@ -374,7 +375,7 @@ fun transExp(venv, tenv) =
 															label=name ^ newlabel(),
 															formals=map #ty arguments,
 															result=resultType,
-															extern=false}, 
+															extern=false}, (* false, ya que las funciones externas se definen en runtime *)
 													insertarFunciones fss env)						
 						in
 							env'
@@ -383,11 +384,11 @@ fun transExp(venv, tenv) =
 				(* Nuevo environment donde están definidas las nuevas funciones *)
 				val venv' = insertarFunciones fs venv (* Este es el que debo retornar *)
 				val venv'' = insertarFunciones fs venv (* Este es el que debo usar para analizar los bodies de las funciones del batch *)
-
+						
 
 				fun agregarParams [] env = env
-					| agregarParams ({typ=NameTy s, ...} :: pp) env = (case tabBusca(s, tenv) of
-						SOME t => tabRInserta(s, Var{ty=t}, agregarParams pp env)
+					| agregarParams ({typ=NameTy s, name, ...} :: pp) env = (case tabBusca(s, tenv) of
+						SOME t => tabRInserta(name, Var{ty=t}, agregarParams pp env)
 						| _ => raise Fail ("trdec(FunctionDec), agregarParams(): se quiere agregar argumento de función con tipo indefinido"))
 					| agregarParams _ _ = raise Fail ("trdec(FunctionDec), agregarParams(): no debería pasar; Tiger no acepta argumentos de función con tipo array o record")
 
@@ -399,23 +400,28 @@ fun transExp(venv, tenv) =
 						tybody
 					end
 
-				(* Analizo todos los bodies de las funciones del batch con venv' *)
-				val functionTypes = List.map (fn ({params, body, ...}, n) => 
+				(* Analizo todos los bodies de las funciones del batch con venv'' *)
+				val functionTypes = List.map (fn ({params, body, ...}, _) => 
 					analizarBody params body venv'') fs
 
-				(* Los tipos que devuelven, por def, cada función del batch, chequear result option *)
-				val batchFunctionTypes = List.map (fn ({result, ...}, n) =>
+				(* Los tipos que devuelven, por def, cada función del batch *)
+				val batchFunctionTypes = List.map (fn ({result, ...}, _) =>
 					symbolToTipo result) fs
 
-				(* NOTA: estoy suponiendo que ambas listas anteriores tienen la misma longitud *)
+				(* Debugging... *)
+				val _ = tigermuestratipos.printTipo("FunctionDec, functionTypes header", hd functionTypes, tabAList(tenv))
+				val _ = tigermuestratipos.printTipo("FunctionDec, batchFunctionTypes header", hd batchFunctionTypes, tabAList(tenv))
 
-				val _ = if listasTiposIguales functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de funciones analizadas no coinciden")
+				fun compareListsTipos (x :: xs) (y :: ys) = if tiposIguales x y then true else false
+					| compareListsTipos _ _ = false
+
+				(* NOTA: se supone que ambas listas anteriores tienen la misma longitud *)
+				val _ = if compareListsTipos functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de resultados de funciones analizadas no coinciden")
+
 
 			in
 				(venv', tenv, [])
-			end
-		| trdec (venv,tenv) (TypeDec []) =
-			(venv, tenv, [])
+			end	
 		| trdec (venv,tenv) (TypeDec ldecs) =
 			let
 				(* Busquemos si hay nombres de tipos repetidos en un mismo batch, ya que no se permite *)
@@ -441,5 +447,5 @@ fun transProg ex =
 								result=SOME ("string"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
 		val {ty=tyt, ...} = transExp(tab_vars, tab_tipos) ex (* main *)
-	in	tigermuestratipos.printTipo("final", tyt, tabAList(tab_tipos)) end
+	in	tigermuestratipos.printTipo("Tipo final del programa", tyt, tabAList(tab_tipos)) end
 end
