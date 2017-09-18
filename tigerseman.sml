@@ -87,7 +87,7 @@ fun transExp(venv, tenv) =
 			let
 				(* Buscamos la función en venv, para extraer información: sólo necesitamos formals y result type *)
 				val (level, label, formals, result, extern) = case tabBusca(f, venv) of
-					SOME(Func f) => (#level f, #label f, #formals f, #result f, #extern f)
+					SOME (Func f) => (#level f, #label f, #formals f, #result f, #extern f)
 					| SOME _ => error(f^": no es una función", nl)
 					| NONE => error(f^": no existe tal función", nl)
 
@@ -95,13 +95,15 @@ fun transExp(venv, tenv) =
 				fun comparar [] [] r = r
 					| comparar [] _ _= error(f^": toma demasiados argumentos", nl)
 					| comparar _ [] _ = error(f^": toma pocos argumentos", nl)
-					| comparar (t :: tt) (a ::aa) r = let
-						val {exp=ae', ty=te'} = trexp a
-						val _ = tiposIguales t te'
-						handle _ => error(f^": argumento de tipo incorrecto", nl)
-					in
-						comparar tt aa r@[{exp=ae', ty=te'}]
-					end
+					| comparar (t :: tt) (a ::aa) r = 
+						let
+							val {exp=ae', ty=te'} = trexp a
+							val _ = if tiposIguales t te' 
+	                                  then () 
+	                                  else error("El(los) argumento(s) de "^f^" no coinciden con su declaración", nl)
+						in
+							comparar tt aa r@[{exp=ae', ty=te'}]
+						end
 
 				val leargs = comparar formals args []
 				val leargs'= List.map #exp leargs (* sacamos código intermedio *)
@@ -248,20 +250,21 @@ fun transExp(venv, tenv) =
 		| trexp(ArrayExp({typ, size, init}, nl)) =
 			let
 				(* Veamos si typ está declarado en tenv como tipo TArray *)
-				val typarr = case tabBusca(typ, tenv) of
-					SOME (TArray(t, _)) => !t
-					| SOME _ => error(typ^" no es de tipo Array", nl)
+				val (typarr, u) = case tabBusca(typ, tenv) of
+					SOME a => (case tipoReal(a, tenv) of
+						TArray (t, u) => (t, u)
+						| _ => error("El tipo "^typ^" no es un TArray", nl))
 					| _ => error("El tipo "^typ^" no existe", nl)
-
+					
 				val {ty=tysize, ...} = trexp size
 				val {ty=tyinit, ...} = trexp init
 
 				(* size debe ser int *)
 				val _ = if tipoReal (tysize, tenv) = TInt then () else error("El tamaño de un arreglo debe ser de tipo TInt", nl)
 				(* init debe ser de tipo typarr *)
-				val _ = if tiposIguales tysize typarr then () else error("El tipo de la inicialización del arreglo debe ser de tipo" ^typ, nl)
+				val _ = if tiposIguales tyinit (!typarr) then () else error("El tipo de la expresión de inicialización de arreglo y el tipo del arreglo no coinciden", nl)
 			in
-				{exp=(), ty=typarr}
+				{exp=(), ty=TArray (typarr, u)}
 			end
 
 		and trvar(SimpleVar s, nl) =
@@ -280,15 +283,15 @@ fun transExp(venv, tenv) =
 				val {ty=tyv, ...} = trvar (v, nl)
 
 				(* tyv debe ser de tipo TRecord. Ademas debemos extraer la lista de fields *)
-				val recordFields = case tyv of
+				val recordFields = case tipoReal(tyv, tenv) of
 					TRecord (l, _) => l
-					| _ => error("v debe ser de tipo record", nl)
+					| _ => error("No es un TRecord", nl)
 
 				(* Debemos ver que el identifier, s, es un id de la lista de fields del record. tyId es el tipo del 
 				identifier s en el record *)
-				val tyId = case List.find (fn (str, tyref, i) => str=str) recordFields of
-					SOME (str, tyref, i) => !tyref
-					| NONE => error(s^": no es un field del record v", nl)
+				val tyId = case List.find (fn (str, tyref, i) => str=s) recordFields of
+					SOME (str, tyref, i) => tipoReal(!tyref, tenv)
+					| NONE => error(s^": no es un field del record", nl)
 
 			in
 				{exp=(), ty=tyId}
@@ -300,11 +303,11 @@ fun transExp(venv, tenv) =
 				(* La variable v debe pertencer a venv y debe tener tipo Var{TArray(t, _)} *)
 				val {ty=tyv, ...} = trvar (v, nl)
 
-				(* Index expression *)
+				(* Index expression debe ser TInt *)
 				val {ty=tye, ...} = trexp e
-				val _ = if tipoReal (tye, tenv) = TInt then () else error("El índice no es de tipo TInt", nl)
+				val _ = if tipoReal (tye, tenv) = TInt then () else error("La expresión utilizada como índice no es de tipo TInt", nl)
 			in
-				case tyv of
+				case tipoReal(tyv, tenv) of
 					TArray(t, _) => {exp=(), ty=(!t)}
 					| _ => error("La variable no es de tipo TArray", nl)
 			end
@@ -312,7 +315,11 @@ fun transExp(venv, tenv) =
 		(* lo más difícil. Por lo tanto, para ir probando lo demás, colocar "ex" en transExp *)
 		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},nl)) = 
 			let
-				val {ty=tyinit, ...} = trexp init
+				val {ty=tyinit, ...} = transExp(venv, tenv) init
+
+				val _ = case tipoReal(tyinit, tenv) of
+					TNil => error("No se puede asignar nil a variable sin saber si es de tipo record", nl)
+					| _ => ()
 
 				(* Aumento venv con nuevo binding *)
 				val venv' = tabRInserta (name, Var{ty=tyinit}, venv)
@@ -322,12 +329,19 @@ fun transExp(venv, tenv) =
 		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},nl)) =
 			let
 				(* Debemos ver que el tipo de name y typ son de tipos equivalentes *)
-				val {ty=tyinit, ...} = trexp init
+				val {ty=tyinit, ...} = transExp(venv, tenv) init
+
 				val tys = case tabBusca(s, tenv) of
 					SOME t => t
 					| NONE => error(s^": no existe tal tipo", nl)
 
-				val _ = if tiposIguales tyinit tys then () else error(name^" y "^s^" no son tipos comparables", nl)
+				val _ = case tipoReal(tyinit, tenv) of
+					TNil => (case tipoReal(tys, tenv) of
+						TRecord _ => ()
+						| _ => error("No se puede asignar nil si la variable "^name^" no se inicializa con tipo record", nl))
+					| _ => ()
+
+				val _ = if tiposIguales tyinit tys then () else error("El tipo de " ^name^" y el tipo "^s^" no son comparables", nl)
 
 				(* En caso contrario, aumento venv *)
 				val venv' = tabRInserta(name, Var{ty=tys}, venv)
@@ -415,9 +429,8 @@ fun transExp(venv, tenv) =
 				fun compareListsTipos (x :: xs) (y :: ys) = if tiposIguales x y then true else false
 					| compareListsTipos _ _ = false
 
-				(* NOTA: se supone que ambas listas anteriores tienen la misma longitud *)
+				(* NOTA: se supone que ambas anteriores tienen la misma longitud *)
 				val _ = if compareListsTipos functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de resultados de funciones analizadas no coinciden")
-
 
 			in
 				(venv', tenv, [])
