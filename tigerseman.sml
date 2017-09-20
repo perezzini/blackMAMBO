@@ -453,12 +453,16 @@ fun transExp(venv, tenv) =
 	in 
 		trexp 
 	end
+
 fun transProg ex =
-	(* ponemos la expresion (AST) en una función de Tiger*)
+	(* ponemos la expresion (AST) en una función de Tiger *)
 	let	val main =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
-								result=SOME ("string"), body=ex}, 0)]],
+								result=SOME ("int"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
 		val {ty=tyt, ...} = transExp(tab_vars, tab_tipos) ex (* main *)
-	in	tigermuestratipos.printTipo("Tipo final del programa", tyt, tabAList(tab_tipos)) end
+	in	
+		(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
+		print "\n")
+	end
 end
