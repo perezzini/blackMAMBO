@@ -136,7 +136,7 @@ fun fijaTipos batch env =
 		val env' = procesa orden batch env recs
 		val env'' = agregarecs env' recs
 		val env''' = fijaNONE (tabAList env'') env''
-		(* val _ = tigermuestratipos.printTTipos(tabAList env'') *) (* Para debaugging *)
+		val _ = (print "\n TENV table: "; tigermuestratipos.printTTipos(tabAList env'''))
 	in	
 		env''' 
 	end
