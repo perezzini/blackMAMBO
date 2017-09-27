@@ -1,9 +1,12 @@
 *.uo
 *.ui
 *.o
+*.bak
 res
 doc/dudas.txt
 doc/tiger-spec.pdf
 doc/tareas.txt
+doc/clases.txt
 tiger
 tests/mine/
+*.output
