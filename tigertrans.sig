@@ -6,15 +6,22 @@ exception divCero
 type level
 type access
 type frag = tigerframe.frag
-val outermost : level
+
+val outermost : level (* Not the level of the Tiger main program, it's the level within which 
+						that program is nested. All "library" functions are declared at this 
+						outermost level, which doesn't contain a frame or formal parameter 
+						list *)
 val newLevel : {parent: level, name: tigertemp.label,
-				formals: bool list} -> level
+				formals: bool list} -> level (* Adds an extra element to the formal-parameter list, 
+												for the static link, and calls tigerframe.newFrame *)
 val formals : level -> access list
 val getActualLev : unit -> int
 val allocArg : level -> bool -> access
-val allocLocal : level -> bool -> access
+val allocLocal : level -> bool -> access (* allocLocal(lev)(esc): creates a local var in level lev; 
+											the argument esc specifies whether the var escapes *)
 
-type exp 
+type exp
+
 val procEntryExit : {level: level, body: exp} -> unit
 val getResult : unit -> frag list
 val unitExp : unit -> exp
