@@ -232,7 +232,7 @@ fun callExp (name,external,isproc,lev:level,ls) =
 
 (* letExp : tigertree.stm list * exp -> exp *)
 fun letExp ([], body) = Ex (unEx body)
- |  letExp (inits, body) = Ex (ESEQ(seq inits,unEx body))
+ |  letExp (inits, body) = Ex (ESEQ(seq inits, unEx body))
 
 (* breakExp : unit -> exp *)
 fun breakExp() = 
@@ -248,8 +248,10 @@ fun seqExp ([]:exp list) = Nx (EXP(CONST 0))
 		in
 			case List.last exps of
 				Nx s =>
-					let val unexps = map unNx exps
-					in Nx (seq unexps) end
+					let val 
+						unexps = map unNx exps
+					in 
+						Nx (seq unexps) end
 				| Ex e => Ex (ESEQ(seq(unx exps), e))
 				| cond => Ex (ESEQ(seq(unx exps), unEx cond))
 		end
@@ -277,14 +279,69 @@ fun whileExp {test: exp, body: exp, lev:level} =
 fun forExp {lo, hi, var, body} =
 	Ex (CONST 0) (*COMPLETAR*)
 
+(* La rama del IF computa un valor *)
 (* ifThenExp : {test: exp, then': exp} -> exp *)
-fun ifThenExp{test, then'} =
-	Ex (CONST 0) (*COMPLETAR*)
+fun ifThenExp{test, then' = Cx condThen'} =
+	let
+		val (t, f, t', f') = (newlabel(), newlabel(), newlabel(), newlabel())
+		val test' = unCx test
+		val tmp = newtemp()
+	in
+		Ex(ESEQ(seq[MOVE(TEMP tmp, CONST 0),
+					test'(t, f),
+					LABEL t,
+						condThen'(t', f'),
+						LABEL t'
+							MOVE(TEMP tmp, CONST 1)
+						LABEL f'
+							CJUMP(NAME f, [f])
+					LABEL f], TEMP tmp))
+	end
+	| ifThenExp{test, then' = Ex (CONST 0)} =
+	| ifThenExp{test, then' = Ex (CONST 1)} =
+		let
+			val (t, f) = (newlabel(), newlabel())
+			val test' = unCx test
+			val tmp = newtemp()
+		in
+			Ex(ESEQ(seq[MOVE(TEMP tmp, CONST 0),
+						test'(t, f),
+						LABEL t,
+							MOVE(TEMP tmp, CONST 1),
+						LABEL f], TEMP tmp))
+		end
+	| ifThenExp{test, then' = Nx _} =
+		let
+			val (t, f) = (newlabel(), newlabel())
+			val test' = unCx test
+			val tmp = newtemp()
+		in
+			Nx(seq[test'(t, f),
+					LABEL t,
+					LABEL f])
+		end
+	| ifThenExp{test, then'} =
+		let
+			val (t, f) = (newlabel(), newlabel())
+			val test' = unCx test
+			val tmp = newtemp()
+			val then'' = unEx then'
+		in
+			body
+		end
 
+(* Las ramas del IF computan un valor *)
 (* ifThenElseExp : {test: exp, then': exp, else': exp} -> exp *)
-fun ifThenElseExp {test,then',else'} =
-	Ex (CONST 0) (*COMPLETAR*)
+fun ifThenElseExp {test, then', else'} =
+	let
+		val (t, f) = (newlabel(), newlabel())
+		val test' = unCx test
+		val then'
+	in
+		body
+	end
 
+(* Las ramas del IF no computan un valor *)
 (* ifThenElseExpUnit : {test: exp, then': exp, else': exp} -> exp *)
 fun ifThenElseExpUnit {test,then',else'} =
 	Ex (CONST 0) (*COMPLETAR*)
@@ -298,13 +355,42 @@ fun assignExp{var, exp} =
 		Nx (MOVE(v,vl))
 	end
 
+(* Integer arithmetic: each tigerabs arithmetic op corresponds to 
+a tigertree op *)
 (* binOpIntExp : {left:exp, oper:tigerabs.oper, right:exp} -> exp *)
 fun binOpIntExp {left, oper, right} = 
-	Ex (CONST 0) (*COMPLETAR*)
+	let
+		(* La subexpresión left debe ser evaluada antes que la 
+		subexpresión right. Ambas computan un valor *)
+		val l = unEx left
+		val r = unEx right
+	in
+		case oper of
+			PlusOp => Ex(BINOP(PLUS, l, r))
+			| MinusOp => Ex(BINOP(MINUS, l, r))
+			| TimesOp => Ex(BINOP(MUL, l, r))
+			| DivideOp => Ex(BINOP(DIV, l, r))
+	end
 
 (* binOpIntRelExp: {left:exp, oper:tigerabs.oper, right:exp} -> exp *)
 fun binOpIntRelExp {left,oper,right} =
-	Ex (CONST 0) (*COMPLETAR*)
+	let
+		(* La subexpresión left debe ser evaluada antes que la 
+		subexpresión right. Ambas computan un valor *)
+		val l = unEx left
+		val r = unEx right
+
+		fun cond oper = fn (t, f) => 
+			CJUMP(oper, l, r, t, f)
+	in
+		case oper of
+			EqOp => Cx(cond EQ)
+			| NeqOp => Cx(cond NE)
+			| LtOp => Cx(cond LT)
+			| LeOp => Cx(cond LE)
+			| GtOp => Cx(cond GT)
+			| GeOp => Cx(cond GE)
+	end
 
 (* binOpStrExp : {left:exp, oper:tigerabs.oper, right:exp} -> exp *)
 fun binOpStrExp {left,oper,right} =
