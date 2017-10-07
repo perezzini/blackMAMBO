@@ -47,54 +47,51 @@ fun topLevel() = tigerpila.topPila levelPila
 *)
 val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	tabNueva(),
-	[("print", Func{level=topPila(), label="print",
+	[("print", Func{level=topLevel(), label="print",
 		formals=[TString], result=TUnit, extern=true}),
-	("flush", Func{level=topPila(), label="flush",
+	("flush", Func{level=topLevel(), label="flush",
 		formals=[], result=TUnit, extern=true}),
-	("getchar", Func{level=topPila(), label="getstr",
+	("getchar", Func{level=topLevel(), label="getstr",
 		formals=[], result=TString, extern=true}),
-	("ord", Func{level=topPila(), label="ord",
+	("ord", Func{level=topLevel(), label="ord",
 		formals=[TString], result=TInt, extern=true}),
-	("chr", Func{level=topPila(), label="chr",
+	("chr", Func{level=topLevel(), label="chr",
 		formals=[TInt], result=TString, extern=true}),
-	("size", Func{level=topPila(), label="size",
+	("size", Func{level=topLevel(), label="size",
 		formals=[TString], result=TInt, extern=true}),
-	("substring", Func{level=topPila(), label="substring",
+	("substring", Func{level=topLevel(), label="substring",
 		formals=[TString, TInt, TInt], result=TString, extern=true}),
-	("concat", Func{level=topPila(), label="concat",
+	("concat", Func{level=topLevel(), label="concat",
 		formals=[TString, TString], result=TString, extern=true}),
-	("not", Func{level=topPila(), label="not",
+	("not", Func{level=topLevel(), label="not",
 		formals=[TInt], result=TInt, extern=true}),
-	("exit", Func{level=topPila(), label="exit",
+	("exit", Func{level=topLevel(), label="exit",
 		formals=[TInt], result=TUnit, extern=true})
 	])
 
-fun tipoReal (TTipo s, (env : tenv)) : Tipo = 
-    (case tabBusca(s , env) of 
-         NONE => raise Fail "tipoReal Ttipo"
-       | SOME t => t)
-  | tipoReal (t, _) = t
+fun tipoReal (TTipo (s, ref (SOME (t)))) = tipoReal t
+  | tipoReal t = t
 
 fun tiposIguales (TRecord _) TNil = true
   | tiposIguales TNil (TRecord _) = true 
   | tiposIguales (TRecord (_, u1)) (TRecord (_, u2 )) = (u1=u2)
   | tiposIguales (TArray (_, u1)) (TArray (_, u2)) = (u1=u2)
-  | tiposIguales (TTipo _) b =
-		(* let *)
-		(* 	val a = case !r of *)
-		(* 		SOME t => t *)
-		(* 		| NONE => raise Fail "No debería pasar! (1)" *)
-		(* in *)
-		(* 	tiposIguales a b *)
-		(* end *)raise Fail "No debería pasar! (1)"
-  | tiposIguales a (TTipo _) =
-		(* let *)
-		(* 	val b = case !r of *)
-		(* 		SOME t => t *)
-		(* 		| NONE => raise Fail "No debería pasar! (2)" *)
-		(* in *)
-		(* 	tiposIguales a b *)
-		(* end *)raise Fail "No debería pasar! (2)"
+  | tiposIguales (TTipo (_, r)) b =
+		let
+			val a = case !r of
+				SOME t => t
+				| NONE => raise Fail "No debería pasar! (1)"
+		in
+			tiposIguales a b
+		end
+  | tiposIguales a (TTipo (_, r)) =
+		let
+			val b = case !r of
+				SOME t => t
+				| NONE => raise Fail "No debería pasar! (2)"
+		in
+			tiposIguales a b
+		end
   | tiposIguales a b = (a=b)
 
 (* Chequea tipos en el AST, y traduce expresiones en código intermedio *)
