@@ -5,6 +5,9 @@ open tigerabs
 open tigersres
 open tigertemp
 
+(* Código intermedio *)
+open tigertrans
+
 (* type expty = {exp: Translate.exp, ty: Tipo}. Usamos () por el momento, ya que no tenemos el módulo Translate *)
 (* expty: expression type *)
 type expty = {exp: unit, ty: Tipo}
@@ -22,28 +25,47 @@ val tab_tipos : (string, Tipo) Tabla = tabInserList(
 	tabNueva(),
 	[("int", TInt), ("string", TString)])
 
-(* bindings de funciones predefinidas de Tiger *)
+(* 	levelPila: pila de levels
+	Mantiene los levels de forma externa.
+	En la inicialización de un programa Tiger, la pila sólo contiene un elemento: el level 
+	tigertrans.outermost (level = 0).
+	Cuando se declara una función, tigertrans.newLevel utiliza topLevel().
+	Esto se utiliza en transDec. Recordemos que transDec crea un nuevo "nesting level" para 
+	cada función llamando a tigertrans.newLevel (esta función, a la vez, llama a 
+	tigertrans.newFrame para crear un nuevo frame).
+*)
+val levelPila: tigertrans.level tigerpila.Pila = tigerpila.nuevaPila1(tigertrans.outermost) 
+fun pushLevel l = tigerpila.pushPila levelPila l
+fun popLevel() = tigerpila.popPila levelPila 
+fun topLevel() = tigerpila.topPila levelPila
+	
+
+(* bindings de funciones predefinidas de Tiger
+	"All library functions are declared at the outermost
+	level, which doesn't contain a frame or formal 
+	parameter list" - page 143
+*)
 val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	tabNueva(),
-	[("print", Func{level=mainLevel, label="print",
+	[("print", Func{level=topPila(), label="print",
 		formals=[TString], result=TUnit, extern=true}),
-	("flush", Func{level=mainLevel, label="flush",
+	("flush", Func{level=topPila(), label="flush",
 		formals=[], result=TUnit, extern=true}),
-	("getchar", Func{level=mainLevel, label="getstr",
+	("getchar", Func{level=topPila(), label="getstr",
 		formals=[], result=TString, extern=true}),
-	("ord", Func{level=mainLevel, label="ord",
+	("ord", Func{level=topPila(), label="ord",
 		formals=[TString], result=TInt, extern=true}),
-	("chr", Func{level=mainLevel, label="chr",
+	("chr", Func{level=topPila(), label="chr",
 		formals=[TInt], result=TString, extern=true}),
-	("size", Func{level=mainLevel, label="size",
+	("size", Func{level=topPila(), label="size",
 		formals=[TString], result=TInt, extern=true}),
-	("substring", Func{level=mainLevel, label="substring",
+	("substring", Func{level=topPila(), label="substring",
 		formals=[TString, TInt, TInt], result=TString, extern=true}),
-	("concat", Func{level=mainLevel, label="concat",
+	("concat", Func{level=topPila(), label="concat",
 		formals=[TString, TString], result=TString, extern=true}),
-	("not", Func{level=mainLevel, label="not",
+	("not", Func{level=topPila(), label="not",
 		formals=[TInt], result=TInt, extern=true}),
-	("exit", Func{level=mainLevel, label="exit",
+	("exit", Func{level=topPila(), label="exit",
 		formals=[TInt], result=TUnit, extern=true})
 	])
 
