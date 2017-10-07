@@ -20,7 +20,15 @@ val newFrame : {name: tigertemp.label, formals: bool list} -> frame (* Creates a
 																	and false for each parameter that does not. 
 																	The result will be a frame object *)
 val name : frame -> tigertemp.label
-val string : tigertemp.label * string -> string
+val string : tigertemp.label * string -> string (* "Tiger strings should be able to contain 8-bit codes 
+													(including zero). A simple representation is to have 
+													a string pointer point to a one-word integer containing 
+													the length, followed immediatly by the chars themselves. 
+													Then the string function in the machine-specific 
+													tigerframe module can make a string with a label definition, 
+													an assembly-language pseudo-instruction to make a word 
+													conaining the integer length, and a pseudo-instruction to 
+													emit character data" - page 163 *)
 val formals : frame -> access list (* Extracts a list of k "accesses" denoting the locations where the formal 
 									parameters will be kept at run-time, as seen from inside the callee. 
 									Parameters may be seen differently by the caller and the callee *)
@@ -32,7 +40,11 @@ val wSz : int
 val log2WSz : int
 val calldefs : tigertemp.temp list
 val callersaves : tigertemp.temp list
-val exp : access -> tigertree.exp -> tigertree.exp
+val exp : access -> tigertree.exp -> tigertree.exp (* "Used by tigertrans to turn a tigerframe.access 
+														into a tigertree expression. The tigertree.exp 
+														argument to tigerframe.exp is the address of 
+														the stack frame that the access lives in" - 
+														page 156 *)
 val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an external function which is 
 																	written in C or assembly lang - it cannot 
 																	be written in Tiger because Tiger has no 
