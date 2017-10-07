@@ -8,7 +8,10 @@ open tigerabs
 exception breakexc
 exception divCero
 	
-type level = {parent:frame option , frame: frame, level: int}
+type level = {parent:frame option, 
+				frame: frame, 
+				level: int}
+				
 type access = tigerframe.access
 
 type frag = tigerframe.frag
