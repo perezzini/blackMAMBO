@@ -1,5 +1,6 @@
 structure tigertree =
 struct
+	(* Computation of some value (possibly with side effects) *)
 	datatype exp = CONST of int
 		     | NAME of tigertemp.label
 		     | TEMP of tigertemp.temp
@@ -7,12 +8,15 @@ struct
 		     | MEM of exp
 		     | CALL of exp*exp list
 		     | ESEQ of stm*exp
+
+	(* Perform side effects and control flow *)
 	and stm = MOVE of exp*exp
 		| EXP of exp
 		| JUMP of exp*tigertemp.label list
 		| CJUMP of relop*exp*exp*tigertemp.label*tigertemp.label
 		| SEQ of stm*stm
 		| LABEL of tigertemp.label
+
 	and binop = PLUS | MINUS | MUL | DIV | AND | OR
 		  | LSHIFT | RSHIFT | ARSHIFT | XOR
 	and relop = EQ | NE | LT | GT | LE | GE | ULT | ULE
