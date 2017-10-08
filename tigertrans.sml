@@ -11,26 +11,34 @@ exception divCero
 type level = {parent:frame option , frame: frame, level: int}
 type access = tigerframe.access
 
+(* frag = tigerframe.frag *)
 type frag = tigerframe.frag
 val fraglist = ref ([]: frag list)
 
 val actualLevel = ref ~1 (* _tigermain debe tener level = 0. *)
 
+(* getActualLev : unit -> int *)
 fun getActualLev() = !actualLevel
 
+(* outermost : level *)
 val outermost: level = {parent = NONE,
 						frame = newFrame{name="_tigermain", formals=[]}, 
 										level=getActualLev()}
 
+(* newLevel : {parent: level, name: tigertemp.label,
+				formals: bool list} -> level *)
 fun newLevel{parent={parent, frame, level}, name, formals} =
 	{parent=SOME frame,
 	frame=newFrame{name=name, formals=formals},
 	level=level+1}
 
+(* allocArg : level -> bool -> access *)
 fun allocArg{parent, frame, level} b = tigerframe.allocArg frame b
 
+(* allocLocal : level -> bool -> access *)
 fun allocLocal{parent, frame, level} b = tigerframe.allocLocal frame b
 	
+(* formals : level -> access list *)
 fun formals{parent, frame, level} = tigerframe.formals frame
 
 (* Tres tipos de expresiones *)
@@ -150,7 +158,7 @@ fun stringLen s =
 		aux(explode s) 
 	end
 
-(* "A string literal in Tiger is the constant addess of a segment of memory initialized 
+(* "A string literal in Tiger is the constant address of a segment of memory initialized 
 	to the proper characters. In assembly lang a label is used to refer to this address 
 	from the middle of some sequence of instructions. At some other place in the 
 	assembly-lang program, the definition of that label appears, followed by the 
@@ -257,6 +265,7 @@ fun subscriptVar(arr, ind) =
 fun recordExp l =
 	let
 		(* a{f1 = e1, ..., fn = en} *)
+
 		(* "The simplest way to create a record is to call an external memory-allocation 
 		function that returns a pointer to an n-word area into a new temp r. Then a series 
 		of MOVE trees can init offsets 0, 1W, 2W, ..., (n-1)W from r with translations of 
@@ -309,7 +318,7 @@ fun callExp (name, external, isproc, lev:level, ls) =
 				- lev is the level of the function calling f (the level of the callee function)
 				- args: list of formals that f takes
 				- isproc: tells if f is a proc or not
-				- e: si es una external call
+				- e: external call or not
 
 			"Static links: Whenever a function f is called, it is passed a pointer to the stack 
 			frame of the current (most recently entered - the function statically enclosing f) 
@@ -589,7 +598,7 @@ fun ifThenElseExpUnit {test, then', else'} =
 				LABEL fl])
 	end
 
-(* assignExp : {var: exp, exp:exp}-> exp *)
+(* assignExp : {var: exp, exp: exp} -> exp *)
 fun assignExp{var, exp} =
 	let
 		val v = unEx var
