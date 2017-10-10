@@ -9,7 +9,10 @@ val tabNueva : unit -> (''a, 'b) Tabla
 val fromTab : (''a, 'b) Tabla -> (''a, 'b) Tabla
 val name : 'a -> 'a
 val tabEsta : ''a * (''a, 'b) Tabla -> bool
+(* se usa cuando se quiere insertar un par sin importar si la clave existe o no, 
+	o si quiero sobreescribir *)
 val tabInserta : ''a * 'b * (''a, 'b) Tabla -> (''a, 'b) Tabla
+(* se debe usar este... R de "reemplaza"*)
 val tabRInserta : ''a * 'b * (''a, 'b) Tabla -> (''a, 'b) Tabla
 val tabBusca : ''a * (''a, 'b) Tabla -> 'b option
 val tabSaca : ''a * (''a, 'b) Tabla -> 'b
