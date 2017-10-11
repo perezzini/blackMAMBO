@@ -74,29 +74,32 @@ val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 		formals=[TInt], result=TUnit, extern=true})
 	])
 
-fun tipoReal (TTipo (s, ref (SOME (t)))) = tipoReal t
-  | tipoReal t = t
+fun tipoReal (TTipo s, (env : tenv)) : Tipo = 
+    (case tabBusca(s , env) of 
+         NONE => raise Fail "tipoReal Ttipo"
+       | SOME t => t)
+  | tipoReal (t, _) = t
 
 fun tiposIguales (TRecord _) TNil = true
   | tiposIguales TNil (TRecord _) = true 
   | tiposIguales (TRecord (_, u1)) (TRecord (_, u2 )) = (u1=u2)
   | tiposIguales (TArray (_, u1)) (TArray (_, u2)) = (u1=u2)
-  | tiposIguales (TTipo (_, r)) b =
-		let
-			val a = case !r of
-				SOME t => t
-				| NONE => raise Fail "No debería pasar! (1)"
-		in
-			tiposIguales a b
-		end
-  | tiposIguales a (TTipo (_, r)) =
-		let
-			val b = case !r of
-				SOME t => t
-				| NONE => raise Fail "No debería pasar! (2)"
-		in
-			tiposIguales a b
-		end
+  | tiposIguales (TTipo _) b =
+		(* let *)
+		(* 	val a = case !r of *)
+		(* 		SOME t => t *)
+		(* 		| NONE => raise Fail "No debería pasar! (1)" *)
+		(* in *)
+		(* 	tiposIguales a b *)
+		(* end *)raise Fail "No debería pasar! (1)"
+  | tiposIguales a (TTipo _) =
+		(* let *)
+		(* 	val b = case !r of *)
+		(* 		SOME t => t *)
+		(* 		| NONE => raise Fail "No debería pasar! (2)" *)
+		(* in *)
+		(* 	tiposIguales a b *)
+		(* end *)raise Fail "No debería pasar! (2)"
   | tiposIguales a b = (a=b)
 
 (* 	transExp: 
@@ -124,7 +127,7 @@ fun transExp(venv, tenv) =
 				fun comparar [] [] r = r
 					| comparar [] _ _= error(f^": toma demasiados argumentos", nl)
 					| comparar _ [] _ = error(f^": toma pocos argumentos", nl)
-					| comparar (t :: tt) (a ::aa) r = 
+					| comparar (t :: tt) (a :: aa) r = 
 						let
 							val {exp=ae', ty=te'} = trexp a
 							val _ = if tiposIguales t te' 
@@ -166,21 +169,21 @@ fun transExp(venv, tenv) =
 			in
 				if tiposIguales tyl tyr then
 					case oper of
-						PlusOp => if tipoReal tyl=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
-						| MinusOp => if tipoReal tyl=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
-						| TimesOp => if tipoReal tyl=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
-						| DivideOp => if tipoReal tyl=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
-						| LtOp => if tipoReal tyl=TInt orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
+						PlusOp => if tipoReal(tyl, tenv)=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
+						| MinusOp => if tipoReal(tyl, tenv)=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
+						| TimesOp => if tipoReal(tyl, tenv)=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
+						| DivideOp => if tipoReal(tyl, tenv)=TInt then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt} else error("Error de tipos", nl)
+						| LtOp => if tipoReal(tyl, tenv)=TInt orelse tipoReal(tyl, tenv)=TString then
+							{exp=if tipoReal(tyl, tenv)=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
 							else error("Error de tipos", nl)
-						| LeOp => if tipoReal tyl=TInt orelse tipoReal tyl=TString then 
-							{exp=if tipoReal tyl=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
+						| LeOp => if tipoReal(tyl, tenv)=TInt orelse tipoReal(tyl, tenv)=TString then 
+							{exp=if tipoReal(tyl, tenv)=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
 							else error("Error de tipos", nl)
-						| GtOp => if tipoReal tyl=TInt orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
+						| GtOp => if tipoReal(tyl, tenv)=TInt orelse tipoReal(tyl, tenv)=TString then
+							{exp=if tipoReal(tyl, tenv)=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
 							else error("Error de tipos", nl)
-						| GeOp => if tipoReal tyl=TInt orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
+						| GeOp => if tipoReal(tyl, tenv)=TInt orelse tipoReal(tyl, tenv)=TString then
+							{exp=if tipoReal(tyl, tenv)=TInt then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt} 
 							else error("Error de tipos", nl)
 						| _ => raise Fail "No debería pasar! (3)"
 				else error("Error de tipos", nl)
@@ -192,9 +195,8 @@ fun transExp(venv, tenv) =
 
 				(* Buscar el tipo y verificar que realmente es un record *)
 				val (tyr, cs) = case tabBusca(typ, tenv) of
-					SOME t => (case tipoReal t of
+					SOME t => (case tipoReal(t,tenv) of
 						TRecord (cs, u) => (TRecord (cs, u), cs)
-						| TTipo(_, ref (SOME(TRecord(cs, u)))) => (TRecord(cs, u), cs) (* está bien mencionar este caso? *)
 						| _ => error(typ^" no es de tipo record", nl))
 					| NONE => error("Tipo inexistente ("^typ^")", nl)
 				
@@ -207,7 +209,7 @@ fun transExp(venv, tenv) =
 				  | verificar _ [] (c::cs) = error("Sobran campos", nl)
 				  | verificar n ((s, t, _)::cs) ((sy, {exp, ty})::ds) =
 						if s<>sy then error("Error de campo", nl)
-						else if tiposIguales ty t then (exp, n)::(verificar (n+1) cs ds)
+						else if tiposIguales ty (!t) then (exp, n)::(verificar (n+1) cs ds)
 							 else error("Error de tipo del campo "^s, nl)
 
 				val lf = verificar 0 cs tfields
@@ -255,8 +257,8 @@ fun transExp(venv, tenv) =
 			    val {exp=thenexp, ty=tythen} = trexp then'
 			    val {exp=elseexp, ty=tyelse} = trexp else'
 			in
-				if tipoReal tytest=TInt andalso tiposIguales tythen tyelse then
-				{exp=if tipoReal tythen=TUnit then ifThenElseExpUnit{test=testexp, then'=thenexp, else'=elseexp} else ifThenElseExp {test=testexp, then'=thenexp, else'=elseexp}, ty=tythen}
+				if tipoReal(tytest, tenv)=TInt andalso tiposIguales tythen tyelse then
+				{exp=if tipoReal(tythen, tenv)=TUnit then ifThenElseExpUnit{test=testexp, then'=thenexp, else'=elseexp} else ifThenElseExp {test=testexp, then'=thenexp, else'=elseexp}, ty=tythen}
 				else error("Error de tipos en if" ,nl)
 			end
 		| trexp(IfExp({test, then', else'=NONE}, nl)) =
@@ -264,7 +266,7 @@ fun transExp(venv, tenv) =
 				val {exp=exptest,ty=tytest} = trexp test
 			    val {exp=expthen,ty=tythen} = trexp then'
 			in
-				if tipoReal tytest=TInt andalso tythen=TUnit then
+				if tipoReal(tytest, tenv)=TInt andalso tythen=TUnit then
 				{exp=ifThenExp{test=exptest, then'=expthen}, ty=TUnit}
 				else error("Error de tipos en if", nl)
 			end
@@ -279,8 +281,8 @@ fun transExp(venv, tenv) =
 				val _ = postWhileForExp()
 
 			in
-				if tipoReal (#ty ttest) = TInt andalso #ty tbody = TUnit then {exp=whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}, ty=TUnit}
-				else if tipoReal (#ty ttest) <> TInt then error("Error de tipo en la condición", nl)
+				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit then {exp=whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}, ty=TUnit}
+				else if tipoReal(#ty ttest, tenv) <> TInt then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
 		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
@@ -288,7 +290,7 @@ fun transExp(venv, tenv) =
 				(* Veamos que lo y hi tienen tipo TInt *)
 				val {ty=tylo, exp=explo} = trexp lo
 				val {ty=tyhi, exp=exphi} = trexp hi
-				val _ = if tipoReal tylo = TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo TInt", nl)
+				val _ = if tipoReal(tylo, tenv) = TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo TInt", nl)
 			
 				(* Acceso de var *)
 				val access' = allocLocal(topLevel()) (!escape)
@@ -335,7 +337,7 @@ fun transExp(venv, tenv) =
 			let
 				(* Veamos si typ está declarado en tenv como tipo TArray *)
 				val (typarr, u) = case tabBusca(typ, tenv) of
-					SOME a => (case tipoReal a of
+					SOME a => (case tipoReal(a, tenv) of
 						TArray (t, u) => (t, u)
 						| _ => error("El tipo "^typ^" no es un TArray", nl))
 					| _ => error("El tipo "^typ^" no existe", nl)
@@ -344,9 +346,9 @@ fun transExp(venv, tenv) =
 				val {ty=tyinit, exp=expinit} = trexp init
 
 				(* size debe ser int *)
-				val _ = if tipoReal tysize = TInt then () else error("El tamaño de un arreglo debe ser de tipo TInt", nl)
+				val _ = if tipoReal(tysize, tenv) = TInt then () else error("El tamaño de un arreglo debe ser de tipo TInt", nl)
 				(* init debe ser de tipo typarr *)
-				val _ = if tiposIguales tyinit typarr then () else error("El tipo de la expresión de inicialización de arreglo y el tipo del arreglo no coinciden", nl)
+				val _ = if tiposIguales tyinit (!typarr) then () else error("El tipo de la expresión de inicialización de arreglo y el tipo del arreglo no coinciden", nl)
 			in
 				{exp=arrayExp{size=expsize, init=expinit}, ty=TArray (typarr, u)}
 			end
@@ -370,14 +372,14 @@ fun transExp(venv, tenv) =
 				val {ty=tyv, exp=expv} = trvar (v, nl)
 
 				(* tyv debe ser de tipo TRecord. Ademas debemos extraer la lista de fields *)
-				val recordFields = case tipoReal tyv of
+				val recordFields = case tipoReal(tyv, tenv) of
 					TRecord (l, _) => l
 					| _ => error("No es un TRecord", nl)
 
 				(* Debemos ver que el identifier, s, es un id de la lista de fields del record. tyId es el tipo del 
 				identifier s en el record *)
 				val (tyId, pos) = case List.find (fn (str, _, _) => str=s) recordFields of
-					SOME (str, tyfield, i) => (tipoReal tyfield, i)
+					SOME (str, tyfield, i) => (tipoReal(!tyfield, tenv), i)
 					| NONE => error(s^": no es un field del record", nl)
 
 			in
@@ -394,8 +396,8 @@ fun transExp(venv, tenv) =
 				val {ty=tye, exp=expe} = trexp e
 				val _ = if tiposIguales tye TInt then () else error("La expresión utilizada como índice no es de tipo TInt", nl)
 			in
-				case tipoReal tyv of
-					TArray(t, _) => {exp=subscriptVar(expv, expe), ty=t}
+				case tipoReal(tyv, tenv) of
+					TArray(t, _) => {exp=subscriptVar(expv, expe), ty=(!t)}
 					| _ => error("La variable no es de tipo TArray", nl)
 			end
 
@@ -422,7 +424,7 @@ fun transExp(venv, tenv) =
 
 				val {ty=tyinit, exp=expinit} = transExp(venv, tenv) init
 
-				val _ = case tipoReal tyinit of
+				val _ = case tipoReal(tyinit,tenv) of
 					TNil => error("No se puede asignar nil a variable sin saber si es de tipo record", nl)
 					| _ => ()
 
@@ -446,8 +448,8 @@ fun transExp(venv, tenv) =
 					SOME t => t
 					| NONE => error(s^": no existe tal tipo", nl)
 
-				val _ = case tipoReal tyinit of
-					TNil => (case tipoReal tys of
+				val _ = case tipoReal(tyinit, tenv) of
+					TNil => (case tipoReal(tys, tenv) of
 						TRecord _ => ()
 						| _ => error("No se puede asignar nil si la variable "^name^" no se inicializa con tipo record", nl))
 					| _ => ()
@@ -530,20 +532,12 @@ fun transExp(venv, tenv) =
 						| _ => raise Fail ("trdec(FunctionDec), agregarParams(): se quiere agregar argumento de función con tipo indefinido"))
 					| agregarParams _ _ = raise Fail ("trdec(FunctionDec), agregarParams(): no debería pasar; Tiger no acepta argumentos de función con tipo array o record")
 
-				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body
-				fun analizarBody params body env = 
-					let
-						val {ty=tybody, exp=expbody} = transExp ((agregarParams params env), tenv) body 
-					in
-						tybody
-					end
-				*)
-
+				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body *)
 				fun analizarBody name params result body env =
 					let
 						val {ty=tybody, exp=expbody} = transExp ((agregarParams params env), tenv) body
 
-						val _ = preFunctionDec()
+						(*val _ = preFunctionDec() iría afuera *)
 
 						val level = case tabBusca(name, env) of
 							SOME (Func{level, ...}) => level
@@ -560,14 +554,18 @@ fun transExp(venv, tenv) =
 
 						(* Volvemos al nivel anterior *)
 						val _ = popLevel()
-						val _ = postFunctionDec()
+						(*val _ = postFunctionDec() iría afuera *)
 					in
 						tybody
 					end
 
+				val _ = preFunctionDec()
+
 				(* Analizo todos los bodies de las funciones del batch con venv'' *)
 				val functionTypes = List.map (fn ({name, params, result, body}, _) => 
-					analizarBody params body venv'') fs
+					analizarBody name params result body venv'') fs
+
+				val _ = postFunctionDec()
 
 				(* Los tipos que devuelven, por definición, cada función del batch *)
 				val batchFunctionTypes = List.map (fn ({result, ...}, _) =>
@@ -585,7 +583,7 @@ fun transExp(venv, tenv) =
 				val _ = if compareListsTipos functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de resultados de funciones analizadas no coinciden")
 
 			in
-				(* 3er elemento: lista vacía? *)
+				(* 3er elemento: lista vacía *)
 				(venv', tenv, [])
 			end	
 		| trdec (venv, tenv) (TypeDec ldecs) =
@@ -618,7 +616,7 @@ fun transProg ex =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
 								result=SOME ("int"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
-		val {ty=tyt, ...} = transExp(tab_vars, tab_tipos) ex (* main *)
+		val {ty=tyt, exp=expt} = transExp(tab_vars, tab_tipos) ex (* main *)
 	in	
 		(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
 		print "\n")
