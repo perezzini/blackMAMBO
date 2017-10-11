@@ -1,3 +1,7 @@
+(*	"Every target machine architecture will have a different standard stack frame layout.
+	If we want Tiger functions to be able to call C functions, we should use the 
+	standard layout" - page 134 
+*)
 signature tigerframe =
 sig
 
@@ -47,6 +51,31 @@ val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an
 																	and so on. Page 156 *)
 val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
 (*val procEntryExit2 : frame * tigerassem.instr list -> tigerassem.instr list*)
+
+(*
+	FRAGMENTS
+
+	"Given a Tiger function definition comprising a level and an already-translated 
+	body expression, the Translate phase should produce a descriptor for the funciton 
+	containing this necessary info:
+		- frame: the frame descriptor containing machine-specific info about local 
+				variables and parameters.
+		- body: the result returned from procEntryExit1
+	Call this pair a fragment to be translated to assembly lang. It's the second kind 
+	of fragment we've seen; the other was the assembly-lang pseudo-instruction sequence 
+	for a string literal. Thus, it is useful to define (in the Translate interface) a 
+	frag datatype.
+
+	The semantic analysis phase calls upon tigertrans.newLevel in processing a function 
+	header. Later it calls other interface fields of tigertrans to translate the body of 
+	the Tiger function; this has the side effect of remembering STRING fragments for any 
+	string literals encountered (pages 163 and 262). Finally the semantic analyzer calls 
+	procEntryExit, which has the side effect of remembering a PROC fragment.
+	All the remembered fragments go into a frag list ref local to tigertrans; then 
+	getResult can be used to extract the fragment list" - page 169
+
+	If PROC returns a value, do: MOVE rv, res
+*)
 datatype frag = PROC of {body: tigertree.stm, frame: frame}
 	| STRING of tigertemp.label * string
 
