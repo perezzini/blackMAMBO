@@ -180,7 +180,8 @@ fun preFunctionDec() =
 
 (* functionDec : exp * level * bool -> exp *)
 fun functionDec(e, l, proc) =
-	let	val body =
+	let	
+		val body =
 				if proc then unNx e
 				else MOVE(TEMP rv, unEx e)
 		val body' = procEntryExit1(#frame l, body)
@@ -318,15 +319,14 @@ fun callExp (name, external, isproc, lev:level, ls) =
 				- lev is the level of the function calling f (the level of the callee function)
 				- args: list of formals that f takes
 				- isproc: tells if f is a proc or not
-				- e: external call or not
+				- e: f is an external call (or not)
 
 			"Static links: Whenever a function f is called, it is passed a pointer to the stack 
 			frame of the current (most recently entered - the function statically enclosing f) 
 			activation of the function g that immediatly encloses f in the text of the program" 
 			- page 133. Here, f is the CALLEE function and g is the CALLER function.
-		*)
 
-		(* El principal problema aquí es generar el SL. Veamos las reglas que tendremos que 
+		El principal problema aquí es generar el SL. Veamos las reglas que tendremos que 
 		usar, todo depende de los niveles de la llamante y la llamada:
 				1er CASO: nivel_llamante = nivel_llamada
 							SL_llamada = SL_llamante
@@ -355,8 +355,14 @@ fun callExp (name, external, isproc, lev:level, ls) =
 							TEMP tigerframe.fp (* 2do CASO *)
 
 
-		fun preparaArgs [] (rt, re) = (rt, re) (* rt: constantes, labels y temps. 
-													re: expresiones a evaluar (se devuelve un exp en un temp) *)
+		(* Usamos la convención de llamada de C, junto con la exigencia de Tiger.
+			Resumiendo:
+			- efectos laterales de izq a der
+			- args en stack de der a izq
+		*)
+		fun preparaArgs [] (rt, re) = (rt, re) (* 	rt: constantes, labels y temps. 
+													re: expresiones a evaluar (se devuelve un exp en un temp) 
+												*)
 			| preparaArgs (h::t) (rt, re) = case h of
 				Ex(CONST s) => preparaArgs t ((CONST s)::rt, re)
 				| Ex(NAME s) => preparaArgs t ((NAME s)::rt, re)
@@ -369,7 +375,7 @@ fun callExp (name, external, isproc, lev:level, ls) =
 						preparaArgs t ((TEMP t')::rt, (MOVE(TEMP t', e))::re)
 					end
 
-		val (ta, ls') = preparaArgs (rev ls) ([], [])
+		val (ta, ls') = preparaArgs (rev ls) ([], []) (* aplicar rev? *)
 		
 		(* external indica si es de run-time. En el caso que así lo sea, no se le pasa el static link *)
 		val ta' = if external then ta else fplev::ta
@@ -378,17 +384,11 @@ fun callExp (name, external, isproc, lev:level, ls) =
 			Nx(seq(ls' @ [EXP(CALL(NAME name, ta'))]))
 		else
 			let
-				(*
-					Para escribir en assembler CALL f(4+3) se debe:
-						1. Computar la suma
-						2. Guardarla en un temporario t
-						3. Llamar CALL f con el registro t)
-				*)
 				val tmp = newtemp()
 			in
 				(* Devolvemos el resultado en rv (return value del machine-target) *)
 				Ex (ESEQ (seq(ls' @ [EXP(CALL(NAME name, ta')),
-                                   MOVE(TEMP tmp,TEMP tigerframe.rv)]), TEMP tmp))
+                                   MOVE(TEMP tmp, TEMP tigerframe.rv)]), TEMP tmp))
 			end
 	end
 
