@@ -399,7 +399,18 @@ fun transExp(venv, tenv) =
 					| _ => error("La variable no es de tipo TArray", nl)
 			end
 
-		(* DECLARACIONES DE VARIABLES, FUNCIONES, Y TIPOS *)
+		(* 	DECLARACIONES DE VARIABLES, FUNCIONES, Y TIPOS
+
+			"The call to transDec will not only return a result record (containing a
+			new type env, value env, and tigertrans.exp) but also will have side 
+			effects: for each variable declaration within the declaration, additional 
+			space will be reserved in the current level's frame. Also, for each function 
+			declaration, a new fragment of Tree code will be kept for the function's 
+			body. ...Therefore, transDec must also return an exp list of assignment 
+			expressions that accomplish these initializations.
+			If transDec is applied to function and type declarations, the exp list 
+			will be empty" - page 167
+		*)
 
 		and trdec (venv, tenv) (VarDec ({name, escape, typ=NONE, init}, nl)) = 
 			let
@@ -421,11 +432,12 @@ fun transExp(venv, tenv) =
 
 				(* Aumento venv con nuevo binding *)
 				val venv' = tabRInserta (name, Var{ty=tyinit, access=access', level=level'}, venv)
+
+				val transVar = varDec(access')
 			in
-				(* Qué va en []? *)
-				(venv', tenv, [])
+				(venv', tenv, [assignExp{var=transVar, exp=expinit}])
 			end
-		| trdec (venv,tenv) (VarDec ({name, escape, typ=SOME s, init}, nl)) =
+		| trdec (venv, tenv) (VarDec ({name, escape, typ=SOME s, init}, nl)) =
 			let
 				(* Debemos ver que el tipo de name y typ son de tipos equivalentes *)
 				val {ty=tyinit, exp=expinit} = transExp(venv, tenv) init
@@ -449,9 +461,10 @@ fun transExp(venv, tenv) =
 				val access' = allocLocal(topLevel()) (!escape)
 
 				val venv' = tabRInserta(name, Var{ty=tys, access=access', level=level'}, venv)
+
+				val transVar = varDec(access')
 			in
-				(* []? *)
-				(venv', tenv, [])
+				(venv', tenv, [assignExp{var=transVar, exp=expinit}])
 			end
 		| trdec (venv, tenv) (FunctionDec fs) =
 			let
@@ -483,51 +496,84 @@ fun transExp(venv, tenv) =
 					| insertarFunciones (({name, params, result, ...}, nl) :: fss) env =
 						let
 							(* Analizo que el tipo del resultado de una función esté definido *)
-							val resultType = symbolToTipo result
+							val funResultType = symbolToTipo result
 
 							(* Analizo los tipos de los argumentos de la función, en busca de alguno no definido en tenv *)
 							val arguments = traducirParams params
 
+							val funLabel = if name = "_tigermain" then name else name^"_"^newlabel()
+							val funLevel = newLevel{parent=topLevel(),
+													name=funLabel,
+													formals=map (! o #escape) params}
+							val funFormals = map #ty arguments
+
 							(* Inserto funciones en environment *)
 							val env' = tabRInserta (name, 
-													Func{level=(),
-															label=name ^ newlabel(),
-															formals=map #ty arguments,
-															result=resultType,
+													Func{level=funLevel,
+															label=funLabel,
+															formals=funFormals,
+															result=funResultType,
 															extern=false}, (* false, ya que las funciones externas se definen en runtime *)
 													insertarFunciones fss env)						
 						in
 							env'
 						end
 
-				(* Nuevo environment donde están definidas las nuevas funciones *)
+				(* Nuevos environments donde están definidas las nuevas funciones *)
 				val venv' = insertarFunciones fs venv (* Este es el que debo retornar *)
 				val venv'' = insertarFunciones fs venv (* Este es el que debo usar para analizar los bodies de las funciones del batch *)
-						
-
+								
+				(* agregarParams : field * env -> env *)
 				fun agregarParams [] env = env
-					| agregarParams ({typ=NameTy s, name, ...} :: pp) env = (case tabBusca(s, tenv) of
-						SOME t => tabRInserta(name, Var{ty=t}, agregarParams pp env)
+					| agregarParams ({name, escape, typ=NameTy s} :: pp) env = (case tabBusca(s, tenv) of
+						SOME t => tabRInserta(name, Var{ty=t, access=allocLocal(topLevel()) (!escape), level=getActualLev()}, agregarParams pp env)
 						| _ => raise Fail ("trdec(FunctionDec), agregarParams(): se quiere agregar argumento de función con tipo indefinido"))
 					| agregarParams _ _ = raise Fail ("trdec(FunctionDec), agregarParams(): no debería pasar; Tiger no acepta argumentos de función con tipo array o record")
 
-				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body *)
+				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body
 				fun analizarBody params body env = 
 					let
-						val {ty=tybody, ...} = transExp ((agregarParams params env), tenv) body 
+						val {ty=tybody, exp=expbody} = transExp ((agregarParams params env), tenv) body 
+					in
+						tybody
+					end
+				*)
+
+				fun analizarBody name params result body env =
+					let
+						val {ty=tybody, exp=expbody} = transExp ((agregarParams params env), tenv) body
+
+						val _ = preFunctionDec()
+
+						val level = case tabBusca(name, env) of
+							SOME (Func{level, ...}) => level
+							| _ => raise Fail "Error interno al analizar cuerpo de función"
+
+						(* Aumentamos un nivel *)
+						val _ = pushLevel level
+
+						val isproc = case result of
+							SOME _ => true
+							| _ => false
+
+						val transFunctionDec = functionDec(expbody, level, isproc)
+
+						(* Volvemos al nivel anterior *)
+						val _ = popLevel()
+						val _ = postFunctionDec()
 					in
 						tybody
 					end
 
 				(* Analizo todos los bodies de las funciones del batch con venv'' *)
-				val functionTypes = List.map (fn ({params, body, ...}, _) => 
+				val functionTypes = List.map (fn ({name, params, result, body}, _) => 
 					analizarBody params body venv'') fs
 
-				(* Los tipos que devuelven, por def, cada función del batch *)
+				(* Los tipos que devuelven, por definición, cada función del batch *)
 				val batchFunctionTypes = List.map (fn ({result, ...}, _) =>
 					symbolToTipo result) fs
 
-				(* Debugging...
+				(* Debugging: entrega1
 				val _ = tigermuestratipos.printTipo("FunctionDec, functionTypes header", hd functionTypes, tabAList(tenv))
 				val _ = tigermuestratipos.printTipo("FunctionDec, batchFunctionTypes header", hd batchFunctionTypes, tabAList(tenv))
 				*)
@@ -539,9 +585,10 @@ fun transExp(venv, tenv) =
 				val _ = if compareListsTipos functionTypes batchFunctionTypes then () else raise Fail ("trdec(FunctionDec): tipos de resultados de funciones analizadas no coinciden")
 
 			in
+				(* 3er elemento: lista vacía? *)
 				(venv', tenv, [])
 			end	
-		| trdec (venv,tenv) (TypeDec ldecs) =
+		| trdec (venv, tenv) (TypeDec ldecs) =
 			let
 				(* Busquemos si hay nombres de tipos repetidos en un mismo batch, ya que no se permite *)
 				fun reps [] = false
@@ -554,6 +601,7 @@ fun transExp(venv, tenv) =
 				val tenv' = (tigertopsort.fijaTipos ldecs' tenv)
 				handle tigertopsort.Ciclo => raise Fail ("trdec(TypeDec): ciclo(s) en batch")
 			in
+				(* 3er elemento: lista vacía *)
 				(venv, tenv', [])
 			end
 	in 
@@ -561,8 +609,12 @@ fun transExp(venv, tenv) =
 	end
 
 fun transProg ex =
-	(* ponemos la expresion (AST) en una función de Tiger *)
+
+	(* Entrega2: "The result of calling transProg should be a 
+		tigertrans.frag list" - page 170
+	*)
 	let	val main =
+				(* ponemos la expresion (AST) en una función de Tiger *)
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
 								result=SOME ("int"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
