@@ -101,16 +101,22 @@ fun unCx (Nx s) = raise Fail ("Error (unCx(Nx..)). Nunca debe suceder")
 	| unCx (Ex (CONST _)) = (fn (t,f) => JUMP(NAME t, [t])) (* caso: true *)
 	| unCx (Ex e) = (fn (t,f) => CJUMP(NE, e, CONST 0, t, f)) (* caso: evaluar expresión e *)
 
+(* Ir : frag list -> string
+	Prints a frag list 
+*)
 fun Ir(e) =
-	let	fun aux(Ex e) = tigerit.tree(EXP e)
-		| aux(Nx s) = tigerit.tree(s)
-		| aux _ = raise Fail "bueno, a completar!"
+	let	
+		fun aux(Ex e) = tigerit.tree(EXP e)
+			| aux(Nx s) = tigerit.tree(s)
+			| aux _ = raise Fail "bueno, a completar!"
+
 		fun aux2(PROC{body, frame}) = aux(Nx body)
-		| aux2(STRING(l, "")) = l^":\n"
-		| aux2(STRING("", s)) = "\t"^s^"\n"
-		| aux2(STRING(l, s)) = l^":\t"^s^"\n"
+			| aux2(STRING(l, "")) = l^":\n"
+			| aux2(STRING("", s)) = "\t"^s^"\n"
+			| aux2(STRING(l, s)) = l^":\t"^s^"\n"
+
 		fun aux3 [] = ""
-		| aux3(h::t) = (aux2 h)^(aux3 t)
+			| aux3(h::t) = (aux2 h)^(aux3 t)
 	in	
 		aux3 e 
 	end
@@ -129,24 +135,30 @@ in
 			| NONE => raise Fail "break incorrecto!"			
 end
 
-(* Global list of frag ("fragments") *)
-val datosGlobs = ref ([]: frag list)
+(* Global list of fragments *)
+val datosGlobs = fraglist
 
+(*	"procEntryExit has the side effect of remembering a PROC
+	fragment" - page 170
+*)
 fun procEntryExit{level: level, body} =
-	let	val label = STRING(name(#frame level), "")
+	let	
+		val label = STRING(name(#frame level), "") (* name : frame -> tigertemp.label *)
 		val body' = PROC{frame= #frame level, body=unNx body}
 		val final = STRING(";;-------", "")
 	in	
-		datosGlobs:=(!datosGlobs@[label, body', final]) 
+		datosGlobs:=(!datosGlobs @ [label, body', final]) 
 	end
 
+(* getResult : unit -> frag list *)
 fun getResult() = !datosGlobs
 
 (* Following static links - page 156 
 	"When a variable x is declared at an outer level of static scope, 
 	static links must be used. To construct this expression, we need 
 	the level l_f of the function f in which x is used, and the level 
-	l_g in which x is declared" *)
+	l_g in which x is declared"
+*)
 fun followSL 0 = TEMP(tigerframe.fp)
 	| followSL n = MEM(BINOP(PLUS, CONST tigerframe.fpPrevLev, followSL (n-1)))
 
@@ -181,6 +193,7 @@ fun preFunctionDec() =
 (* functionDec : exp * level * bool -> exp *)
 fun functionDec(e, l, proc) =
 	let	
+		(* body pertenece a tigertree.stm *)
 		val body =
 				if proc then unNx e
 				else MOVE(TEMP rv, unEx e)
@@ -256,7 +269,7 @@ fun subscriptVar(arr, ind) =
 	in
 		Ex(ESEQ(seq[MOVE(TEMP ra, a),
 					MOVE(TEMP ri, i),
-					EXP(externalCall("_checkIndex", [TEMP ra, TEMP ri]))],
+					EXP(externalCall("_checkIndexArray", [TEMP ra, TEMP ri]))],
 					MEM(BINOP(PLUS, TEMP ra,
 						BINOP(MUL, TEMP ri, CONST tigerframe.wSz)))))
 		(* Devuelve MEM(...) para hacer fetch del elemento del array en cuestión *)
@@ -296,7 +309,7 @@ fun arrayExp{size, init} =
 		val s = unEx size
 		val i = unEx init
 	in
-		Ex(externalCall("_allocArray", [s, i]))
+		Ex(externalCall("_initArray", [s, i]))
 	end
 
 (* callExp : tigertemp.label * bool * bool * level * exp list -> exp *)
@@ -659,7 +672,7 @@ fun binOpStrExp {left,oper,right} =
 
 		fun cond oper = fn (t, f) => 
 			CJUMP(oper,
-				tigerframe.externalCall("_stringEqual", [l, r]), 
+				tigerframe.externalCall("_stringCompare", [l, r]), 
 				CONST 0,
 				t, 
 				f)
