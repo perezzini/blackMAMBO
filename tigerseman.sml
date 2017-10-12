@@ -537,8 +537,6 @@ fun transExp(venv, tenv) =
 					let
 						val {ty=tybody, exp=expbody} = transExp ((agregarParams params env), tenv) body
 
-						(*val _ = preFunctionDec() iría afuera *)
-
 						val level = case tabBusca(name, env) of
 							SOME (Func{level, ...}) => level
 							| _ => raise Fail "Error interno al analizar cuerpo de función"
@@ -554,18 +552,20 @@ fun transExp(venv, tenv) =
 
 						(* Volvemos al nivel anterior *)
 						val _ = popLevel()
-						(*val _ = postFunctionDec() iría afuera *)
 					in
 						tybody
 					end
 
-				val _ = preFunctionDec()
 
 				(* Analizo todos los bodies de las funciones del batch con venv'' *)
 				val functionTypes = List.map (fn ({name, params, result, body}, _) => 
-					analizarBody name params result body venv'') fs
-
-				val _ = postFunctionDec()
+					let
+						val _ = preFunctionDec()
+						val tybody = analizarBody name params result body venv''
+						val _ = postFunctionDec()
+					in
+						tybody
+					end) fs
 
 				(* Los tipos que devuelven, por definición, cada función del batch *)
 				val batchFunctionTypes = List.map (fn ({result, ...}, _) =>
