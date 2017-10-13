@@ -278,10 +278,12 @@ fun transExp(venv, tenv) =
 
 				val tbody = trexp body
 
+				val exptrans = whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}
+
 				val _ = postWhileForExp()
 
 			in
-				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit then {exp=whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}, ty=TUnit}
+				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit then {exp=exptrans, ty=TUnit}
 				else if tipoReal(#ty ttest, tenv) <> TInt then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
@@ -522,8 +524,7 @@ fun transExp(venv, tenv) =
 						end
 
 				(* Nuevos environments donde están definidas las nuevas funciones *)
-				val venv' = insertarFunciones fs venv (* Este es el que debo retornar *)
-				val venv'' = insertarFunciones fs venv (* Este es el que debo usar para analizar los bodies de las funciones del batch *)
+				val venv' = insertarFunciones fs venv (* Este es el que retorno *)
 								
 				(* agregarParams : field * env -> env *)
 				fun agregarParams [] env = env
@@ -535,7 +536,11 @@ fun transExp(venv, tenv) =
 				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body *)
 				fun analizarBody name params result body env =
 					let
-						val {ty=tybody, exp=expbody} = transExp ((agregarParams params env), tenv) body
+						val venv'' = agregarParams params env
+
+						val isproc = case result of
+							SOME _ => false
+							| _ => true
 
 						val level = case tabBusca(name, env) of
 							SOME (Func{level, ...}) => level
@@ -544,14 +549,12 @@ fun transExp(venv, tenv) =
 						(* Aumentamos un nivel *)
 						val _ = pushLevel level
 
-						val isproc = case result of
-							SOME _ => true
-							| _ => false
-
-						val transFunctionDec = functionDec(expbody, level, isproc)
+						val {ty=tybody, exp=expbody} = transExp (venv'', tenv) body
 
 						(* Volvemos al nivel anterior *)
 						val _ = popLevel()
+
+						val transFunctionDec = functionDec(expbody, level, isproc)
 					in
 						tybody
 					end
@@ -561,7 +564,7 @@ fun transExp(venv, tenv) =
 				val functionTypes = List.map (fn ({name, params, result, body}, _) => 
 					let
 						val _ = preFunctionDec()
-						val tybody = analizarBody name params result body venv''
+						val tybody = analizarBody name params result body venv'
 						val _ = postFunctionDec()
 					in
 						tybody
@@ -616,7 +619,7 @@ fun transProg ex =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
 								result=SOME ("int"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
-		val {ty=tyt, exp=expt} = transExp(tab_vars, tab_tipos) ex (* main *)
+		val {ty=tyt, exp=expt} = transExp(tab_vars, tab_tipos) main (* use 'ex' to get real type of input expression *)
 	in	
 		(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
 		print "\n")
