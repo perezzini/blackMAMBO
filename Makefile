@@ -75,9 +75,11 @@ tigertopsort.uo: tigertopsort.ui tigertab.ui tigertips.uo tigerabs.uo \
     tigermuestratipos.ui 
 tigermuestratipos.ui: tigertips.uo 
 tigerescap.ui: tigerabs.uo 
+tigerinterp.uo: tigertree.uo tigertab.ui tigerframe.ui tigerit.uo \
+    tigertemp.ui 
 tigertab.uo: tigertab.ui 
-tigermain.uo: tigerseman.ui tigerescap.ui tigergrm.ui tigerlex.uo \
-    tigerpp.uo 
+tigermain.uo: tigerseman.ui tigerescap.ui tigergrm.ui tigerframe.ui \
+    tigerit.uo tigercanon.ui tigerlex.uo tigertrans.ui tigerpp.uo 
 tigerseman.uo: tigerseman.ui tigersres.uo tigertab.ui tigerpila.ui \
     tigertopsort.ui tigertemp.ui tigerabs.uo tigermuestratipos.ui \
     tigertrans.ui 
@@ -92,7 +94,8 @@ tigermuestratipos.uo: tigermuestratipos.ui tigertips.uo
 tigerframe.uo: tigerframe.ui tigertree.uo tigertemp.ui 
 tigerit.uo: tigertree.uo tigertab.ui 
 tigergrm.ui: tigerabs.uo 
-tigersres.uo: tigertab.ui tigertips.uo tigertemp.ui tigerabs.uo 
+tigersres.uo: tigertab.ui tigertips.uo tigertemp.ui tigerabs.uo \
+    tigertrans.ui 
 tigerlex.uo: tigergrm.ui tigernlin.uo 
 tigertrans.ui: tigertree.uo tigerframe.ui tigertemp.ui tigerabs.uo 
 tigerpp.uo: tigerabs.uo 
