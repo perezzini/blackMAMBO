@@ -39,6 +39,8 @@ fun main(args) =
 				else 
 					()
 
+		val _ = transProg(expr);
+
 
 		(* Canonize function *)
 		(* canonize : tigertree.stm -> tigertree.stm list *)
@@ -69,12 +71,11 @@ fun main(args) =
 		val _ = if canon 
                 then 
                 	List.app (fn (c, n) => 
-                        (print(n^":\n");
+                        (print("\n"^n^":\n");
                          List.app (print o tigerit.tree) c)) procsCanonized
                 else 
                 	()
 	in
-		transProg(expr); (* semantic analysis, definida en tigerseman.sml *)
 		print "yes!!\n"
 	end	handle Fail s => print("Fail: "^s^"\n")
 
