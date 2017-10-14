@@ -28,9 +28,17 @@ val outermost: level = {parent = NONE,
 (* newLevel : {parent: level, name: tigertemp.label,
 				formals: bool list} -> level *)
 fun newLevel{parent={parent, frame, level}, name, formals} =
-	{parent=SOME frame,
-	frame=newFrame{name=name, formals=formals},
-	level=level+1}
+	let
+		(* Debugging *)
+		val _ = print("\n**Debugging from tigertrans.newLevel\n")
+		val _ = print("Function name: "^name^"\n")
+		val _ = print(name^"'s function parent level: "^tigerframe.name (frame)^"\n")
+		val _ = print(name^"'s function parent level: "^Int.toString(level)^"\n")
+	in
+		{parent=SOME frame,
+		frame=newFrame{name=name, formals=formals},
+		level=level+1}
+	end
 
 (* allocArg : level -> bool -> access *)
 fun allocArg{parent, frame, level} b = tigerframe.allocArg frame b
@@ -357,13 +365,18 @@ fun callExp (name, external, isproc, lev:level, ls) =
 			| traerFP n = MEM(BINOP(PLUS, traerFP(n - 1), CONST fpPrevLev))
 
 		val calleeLev = #level lev
-		(* getActualLev(): level of the caller function *)
+		val callerLev = getActualLev()
 
-		val fplev = if calleeLev = getActualLev() then 
+		(* Debugging *)
+		val _ = print("\n**Debugging from callExp\n")
+		val _ = print("callee lev = "^Int.toString(calleeLev)^"\n")
+		val _ = print("getActualLev() = "^Int.toString(callerLev)^"\n")
+
+		val fplev = if calleeLev = callerLev then 
 						MEM(BINOP(PLUS, TEMP tigerframe.fp, CONST tigerframe.fpPrevLev)) (* 1er CASO *)
 					else 
-						if calleeLev < getActualLev() then 
-							traerFP (getActualLev() - (#level lev) + 1) (* 3er CASO *)
+						if calleeLev < callerLev then 
+							traerFP (callerLev - (#level lev) + 1) (* 3er CASO *)
 						else 
 							TEMP tigerframe.fp (* 2do CASO *)
 
