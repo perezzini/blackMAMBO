@@ -30,13 +30,13 @@ val outermost: level = {parent = NONE,
 fun newLevel{parent={parent, frame, level}, name, formals} =
 	let
 		(* Debugging *)
-		val _ = print("\n**Debugging from tigertrans.newLevel\n")
-		val _ = print("Function name: "^name^"\n")
+		val _ = print("\n**DEBUGGING from tigertrans.newLevel. Function name: "^name^"\n")
 		val _ = print(name^"'s function parent level: "^tigerframe.name (frame)^"\n")
-		val _ = print(name^"'s function parent level: "^Int.toString(level)^"\n")
+		val _ = print(name^"'s function parent level number: "^Int.toString(level)^"\n")
 	in
 		{parent=SOME frame,
-		frame=newFrame{name=name, formals=formals},
+		frame=newFrame{name=name, 
+						formals=formals},
 		level=level+1}
 	end
 
@@ -368,9 +368,9 @@ fun callExp (name, external, isproc, lev:level, ls) =
 		val callerLev = getActualLev()
 
 		(* Debugging *)
-		val _ = print("\n**Debugging from callExp\n")
-		val _ = print("callee lev = "^Int.toString(calleeLev)^"\n")
-		val _ = print("getActualLev() = "^Int.toString(callerLev)^"\n")
+		val _ = print("\n**DEBUGGING from tigertrans.callExp. Function name: "^name^"\n")
+		val _ = print("callee level = "^Int.toString(calleeLev)^"\n")
+		val _ = print("caller level = "^Int.toString(callerLev)^"\n")
 
 		val fplev = if calleeLev = callerLev then 
 						MEM(BINOP(PLUS, TEMP tigerframe.fp, CONST tigerframe.fpPrevLev)) (* 1er CASO *)
@@ -379,7 +379,6 @@ fun callExp (name, external, isproc, lev:level, ls) =
 							traerFP (callerLev - (#level lev) + 1) (* 3er CASO *)
 						else 
 							TEMP tigerframe.fp (* 2do CASO *)
-
 
 		(* Usamos la convención de llamada de C, junto con la exigencia de Tiger.
 			Resumiendo:
