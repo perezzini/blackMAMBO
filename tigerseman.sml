@@ -551,10 +551,10 @@ fun transExp(venv, tenv) =
 
 						val {ty=tybody, exp=expbody} = transExp (venv'', tenv) body
 
+						val transFunctionDec = functionDec(expbody, level, isproc)
+
 						(* Volvemos al nivel anterior *)
 						val _ = popLevel()
-
-						val transFunctionDec = functionDec(expbody, level, isproc)
 					in
 						tybody
 					end
