@@ -367,6 +367,15 @@ fun callExp (name, external, isproc, lev:level, ls) =
 		val calleeLev = #level lev
 		val callerLev = getActualLev()
 
+		val callerName = case #parent lev of
+			SOME f => tigerframe.name f
+			| _ => "NONE"
+
+		(* Debugging *)
+		val _ = print("\n**DEBUGGING from tigertrans.callExp. Function name: "^name^"\n")
+		val _ = print("callee ("^name^") level = "^Int.toString(calleeLev)^"\n")
+		val _ = print("caller ("^callerName^") level = "^Int.toString(callerLev)^"\n")
+
 		val fplev = if calleeLev = callerLev then 
 						MEM(BINOP(PLUS, TEMP tigerframe.fp, CONST tigerframe.fpPrevLev)) (* 1er CASO *)
 					else 
