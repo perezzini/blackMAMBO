@@ -211,7 +211,7 @@ struct
 
 		fun getstrFun(args) = 
 		let
-			val str = TextIO.inputLine TextIO.stdIn
+			val str = valOf(TextIO.inputLine TextIO.stdIn)
 		in
 			storeString str
 		end
