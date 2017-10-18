@@ -222,7 +222,7 @@ struct
 				("_checkIndexArray", checkIndexArray),
 				("_allocRecord", allocRecord),
 				("_checkNil", checkNil),
-				("_stringcmp", stringCompare),
+				("_stringCompare", stringCompare),
 				("print", printFun),
 				("flush", flushFun),
 				("ord", ordFun),
