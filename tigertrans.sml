@@ -472,37 +472,38 @@ fun whileExp {test: exp, body: exp, lev:level} =
 
 (* forExp : {lo: exp, hi: exp, var: exp, body: exp} -> exp *)
 fun forExp {lo, hi, var, body} =
-	let
-		val var' = unEx var
-		val (l1, l2, lsal) = (newlabel(), newlabel(), newlabel())
-	in
-		case hi of
-			Ex(CONST n) => Nx(seq[MOVE(var', unEx lo),
-									CJUMP(LE, var', CONST n, l2, lsal),
-									LABEL l2,
-										unNx body,
-										CJUMP(EQ, var', CONST n, lsal, l1),
-									LABEL l1,
-										MOVE(var', BINOP(PLUS, var', CONST 1)),
-										JUMP(NAME l2, [l2]),
-									LABEL lsal])
-			(* hi no es CONST *)
-			| _ =>
-				let
-					val t = newtemp()
-				in
-					Nx(seq[MOVE(var', unEx lo),
-							MOVE(TEMP t, unEx hi),
-							CJUMP(LE, var', TEMP t, l2, lsal),
-							LABEL l2,
-								unNx body,
-								CJUMP(EQ, var', TEMP t, lsal, l1),
-							LABEL l1,
-								MOVE(var', BINOP(PLUS, var', CONST 1)),
-								JUMP(NAME l2, [l2]),
-							LABEL lsal])
-				end
-	end
+    let 
+        val var' = unEx var
+        val (l1, l2, lsal) = (newlabel(), newlabel(), topSalida())
+    in
+        case hi of
+          Ex (CONST n) =>
+               Nx (seq [MOVE (var', unEx lo),
+                        CJUMP (LE, var', CONST n, l2, lsal),
+                        LABEL l2, 
+                          unNx body,
+                          CJUMP (EQ, var', CONST n, lsal, l1),
+                        LABEL l1, 
+                          MOVE (var', BINOP (PLUS, var', CONST 1)),
+                          JUMP (NAME l2, [l2]),
+                        LABEL lsal])
+
+        | _ => (* hi no es CONST *)
+            let 
+                val t_hi = newtemp()
+            in 
+               Nx (seq [MOVE (var', unEx lo),
+                        MOVE(TEMP t_hi, unEx hi),
+                        CJUMP (LE, var', TEMP t_hi, l2, lsal),
+                        LABEL l2, 
+                          unNx body,
+                          CJUMP (EQ, var', TEMP t_hi, lsal, l1),
+                        LABEL l1, 
+                          MOVE (var', BINOP (PLUS, var', CONST 1)),
+                          JUMP (NAME l2, [l2]),
+                        LABEL lsal])
+            end
+    end
 
 (* La rama del IF computa un valor *)
 (* ifThenExp : {test: exp, then': exp} -> exp *)
@@ -626,6 +627,49 @@ fun ifThenElseExpUnit {test, then', else'} =
 					else'',
 				LABEL fl])
 	end
+
+(*
+fun ifThenExp{test, then'} =
+    let
+        val (t, f) = (temp.newlabel(),temp.newlabel())
+        val test' = unCx(test)
+    in
+        Nx( seq ([test' (t, f), 
+                  LABEL t, 
+                  unNx(then'), 
+                  LABEL f]))
+    end
+
+fun ifThenElseExp {test, then', else'} =
+    let
+        val (t, f, final) = (temp.newlabel(), temp.newlabel(), temp.newlabel())
+        val temp = temp.newtemp()
+        val test' = unCx(test)
+    in
+        Ex (ESEQ (seq ([test' (t, f), 
+                        LABEL t, 
+                        MOVE(TEMP temp, unEx(then')), 
+                        JUMP(NAME final, [final]), 
+                        LABEL f, 
+                        MOVE(TEMP temp, unEx(else')), 
+                        LABEL final]), 
+                  TEMP temp))
+    end
+
+fun ifThenElseExpUnit {test, then', else'} =
+    let
+        val (t, f, final) = (temp.newlabel(), temp.newlabel(), temp.newlabel())
+        val test' = unCx(test)
+    in
+        Nx (seq ([test' (t, f), 
+                  LABEL t, 
+                  unNx(then'), 
+                  JUMP (NAME final, [final]), 
+                  LABEL f, 
+                  unNx(else'), 
+                  LABEL final]))
+    end
+*)
 
 (* assignExp : {var: exp, exp: exp} -> exp *)
 fun assignExp{var, exp} =
