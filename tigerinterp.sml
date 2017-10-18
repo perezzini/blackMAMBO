@@ -362,5 +362,5 @@ struct
 			in
 				rv
 			end
-	in (print("Comienzo de ejecución...\n"); evalFun("_tigermain", []); print("Fin de ejecución.\n")) end
+	in (print("\nComienzo de ejecución...\n"); evalFun("_tigermain", []); print("\nFin de ejecución.\n")) end
 end
