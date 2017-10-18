@@ -529,7 +529,9 @@ fun transExp(venv, tenv) =
 				(* agregarParams : field * env -> env *)
 				fun agregarParams [] env = env
 					| agregarParams ({name, escape, typ=NameTy s} :: pp) env = (case tabBusca(s, tenv) of
-						SOME t => tabRInserta(name, Var{ty=t, access=allocLocal(topLevel()) (!escape), level=getActualLev()}, agregarParams pp env)
+						SOME t => tabRInserta(name, 
+												Var{ty=t, access=allocLocal(topLevel()) (!escape), level=getActualLev()}, 
+												agregarParams pp env)
 						| _ => raise Fail ("trdec(FunctionDec), agregarParams(): se quiere agregar argumento de función con tipo indefinido"))
 					| agregarParams _ _ = raise Fail ("trdec(FunctionDec), agregarParams(): no debería pasar; Tiger no acepta argumentos de función con tipo array o record")
 
