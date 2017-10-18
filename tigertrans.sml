@@ -186,12 +186,12 @@ fun stringLen s =
 	appropriate characters" - page 163 *)
 (* stringExp : string -> exp *)
 fun stringExp(s: string) =
-	let	val l = newlabel()
-		val len = ".long "^makestring(stringLen s)
-		val str = ".string \""^s^"\""
-		val _ = datosGlobs:=(!datosGlobs @ [STRING(l, len), STRING("", str)])
-	in	
-		Ex(NAME l) 
+    let 
+    	val l = newlabel()
+        val str = s
+        val _ = datosGlobs:=(!datosGlobs @ [STRING(l, str)])
+    in  
+    	Ex(NAME l) 
 	end
 
 fun preFunctionDec() =
@@ -404,7 +404,7 @@ fun callExp (name, external, isproc, lev:level, ls) =
 						preparaArgs t ((TEMP t')::rt, (MOVE(TEMP t', e))::re)
 					end
 
-		val (ta, ls') = preparaArgs (rev ls) ([], []) (* aplicar rev? *)
+		val (ta, ls') = preparaArgs ls ([], []) (* aplicar rev? Parece que no *)
 		
 		(* external indica si es de run-time. En el caso que así lo sea, no se le pasa el static link *)
 		val ta' = if external then ta else fplev::ta
