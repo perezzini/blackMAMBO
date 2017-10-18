@@ -251,7 +251,7 @@ fun transExp(venv, tenv) =
 			in
 				if tiposIguales tyexp tyvar then {exp=assignExp{var=expv, exp=expe}, ty=TUnit} else error("Error de tipos para asignación", nl)
 			end
-		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
+		(*| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
 			let 
 				val {exp=testexp, ty=tytest} = trexp test
 			    val {exp=thenexp, ty=tythen} = trexp then'
@@ -260,8 +260,21 @@ fun transExp(venv, tenv) =
 				if tipoReal(tytest, tenv)=TInt andalso tiposIguales tythen tyelse then
 				{exp=if tipoReal(tythen, tenv)=TUnit then ifThenElseExpUnit{test=testexp, then'=thenexp, else'=elseexp} else ifThenElseExp {test=testexp, then'=thenexp, else'=elseexp}, ty=tythen}
 				else error("Error de tipos en if" ,nl)
-			end
-		| trexp(IfExp({test, then', else'=NONE}, nl)) =
+			end*)
+		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
+            let val {exp=testexp, ty=tytest} = trexp test
+                val {exp=thenexp, ty=tythen} = trexp then'
+                val {exp=elseexp, ty=tyelse} = trexp else'
+            in
+                if tipoReal(tytest, tenv) = TInt andalso tiposIguales tythen tyelse 
+                then   {exp=
+                            if tipoReal(tythen, tenv) = TUnit 
+                            then ifThenElseExpUnit {test=testexp,then'=thenexp,else'=elseexp} 
+                            else ifThenElseExp {test=testexp,then'=thenexp,else'=elseexp},
+                        ty=tythen}
+                else error("Error de tipos en if" , nl)
+            end
+		(*| trexp(IfExp({test, then', else'=NONE}, nl)) =
 			let 
 				val {exp=exptest,ty=tytest} = trexp test
 			    val {exp=expthen,ty=tythen} = trexp then'
@@ -269,7 +282,15 @@ fun transExp(venv, tenv) =
 				if tipoReal(tytest, tenv)=TInt andalso tythen=TUnit then
 				{exp=ifThenExp{test=exptest, then'=expthen}, ty=TUnit}
 				else error("Error de tipos en if", nl)
-			end
+			end*)
+		| trexp(IfExp({test, then', else'=NONE}, nl)) =
+            let val {exp=exptest,ty=tytest} = trexp test
+                val {exp=expthen,ty=tythen} = trexp then'
+            in
+                if tipoReal(tytest, tenv) = TInt andalso tythen=TUnit 
+                then {exp=ifThenExp{test=exptest, then'=expthen}, ty=TUnit}
+                else error("Error de tipos en if", nl)
+            end
 		| trexp(WhileExp({test, body}, nl)) =
 			let
 				val ttest = trexp test
@@ -617,7 +638,7 @@ fun transProg ex =
 		tigertrans.frag list" - page 170
 	*)
 	let	val main =
-				(* ponemos la expresion (AST) en una función de Tiger *)
+				(* AST expression inside a Tiger function that returns Unit *)
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
 								result=SOME ("int"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
