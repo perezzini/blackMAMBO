@@ -21,6 +21,7 @@ fun main(args) =
 		val (code, l5)		= arg(l4, "-code") 
 		val (flow, l6)		= arg(l5, "-flow") 
 		val (inter, l7)		= arg(l6, "-inter")
+		val (debug, l8)		= arg(l7, "-debug")
 
 		val entrada =
 			case l7 of
@@ -39,6 +40,7 @@ fun main(args) =
 				else 
 					()
 
+		(* Evaluate input expression: type-checking, and translation to IR code *)
 		val _ = transProg(expr);
 
 
@@ -63,20 +65,27 @@ fun main(args) =
 
 		val (procs, strings) = fragPartition fragments ([], [])
 
-		(* procsCanonized : (tigertree.stm * tigertemp.label) list *)
+		(* procsCanonized : (tigertree.stm list * tigertemp.label) list *)
 		val procsCanonized = map (fn {body, frame} => 
-			(canonize body, tigerframe.name frame)) procs
+			(canonize body, frame)) procs
 
 		(* -canon OPTION *)
 		val _ = if canon 
                 then 
-                	List.app (fn (c, n) => 
-                        (print("\n"^n^":\n");
+                	List.app (fn (c, f) => 
+                        (print("\n"^tigerframe.name(f)^":\n");
                          List.app (print o tigerit.tree) c)) procsCanonized
                 else 
                 	()
+
+        (* -inter OPTION *)
+        val _ = if inter 
+        		then 
+        			tigerinterp.inter false procsCanonized strings 
+        		else 
+        			()
 	in
-		print "yes!!\n"
+		print "\nyes!!, end of tigermain without any errors\n"
 	end	handle Fail s => print("Fail: "^s^"\n")
 
 val _ = main(CommandLine.arguments())
