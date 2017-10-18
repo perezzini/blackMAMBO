@@ -142,7 +142,7 @@ fun transExp(venv, tenv) =
 
 				val isproc = if tiposIguales TUnit result then true else false
 			in
-				{exp=callExp(f, extern, isproc, level, leargs'), ty=result}
+				{exp=callExp(label, extern, isproc, level, leargs'), ty=result}
 			end
 		| trexp(OpExp({left, oper=EqOp, right}, nl)) =
 			let
@@ -544,14 +544,14 @@ fun transExp(venv, tenv) =
 							env'
 						end
 
-				(* Nuevos environments donde están definidas las nuevas funciones *)
+				(* Nuevo environment donde están definidas las nuevas funciones *)
 				val venv' = insertarFunciones fs venv (* Este es el que retorno *)
 								
 				(* agregarParams : field * env -> env *)
 				fun agregarParams [] env = env
 					| agregarParams ({name, escape, typ=NameTy s} :: pp) env = (case tabBusca(s, tenv) of
 						SOME t => tabRInserta(name, 
-												Var{ty=t, access=allocLocal(topLevel()) (!escape), level=getActualLev()}, 
+												Var{ty=t, access=allocArg(topLevel()) (!escape), level=getActualLev()}, 
 												agregarParams pp env)
 						| _ => raise Fail ("trdec(FunctionDec), agregarParams(): se quiere agregar argumento de función con tipo indefinido"))
 					| agregarParams _ _ = raise Fail ("trdec(FunctionDec), agregarParams(): no debería pasar; Tiger no acepta argumentos de función con tipo array o record")
@@ -559,7 +559,6 @@ fun transExp(venv, tenv) =
 				(* Analiza body de una función: agrega parámetros y evalúa, con ellos, la expresión body *)
 				fun analizarBody name params result body env =
 					let
-						val venv'' = agregarParams params env
 
 						val isproc = case result of
 							SOME _ => false
@@ -571,6 +570,8 @@ fun transExp(venv, tenv) =
 
 						(* Aumentamos un nivel *)
 						val _ = pushLevel level
+
+						val venv'' = agregarParams params env
 
 						val {ty=tybody, exp=expbody} = transExp (venv'', tenv) body
 
