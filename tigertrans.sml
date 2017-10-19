@@ -187,8 +187,11 @@ fun stringLen s =
 (* stringExp : string -> exp *)
 fun stringExp(s: string) =
     let 
+    	fun format [] = []
+            | format (#"\\"::(#"x"::(#"0"::(#"a"::xs)))) = (#"\n"::format xs)
+            | format (x::xs) = x :: (format xs) (* otros casos *)
     	val l = newlabel()
-        val str = s
+        val str = (implode o format o explode) s
         val _ = datosGlobs:=(!datosGlobs @ [STRING(l, str)])
     in  
     	Ex(NAME l) 
@@ -404,7 +407,9 @@ fun callExp (name, external, isproc, lev:level, ls) =
 						preparaArgs t ((TEMP t')::rt, (MOVE(TEMP t', e))::re)
 					end
 
-		val (ta, ls') = preparaArgs ls ([], []) (* aplicar rev? Parece que no *)
+		val (ta, ls') = preparaArgs ls ([], []) (* aplicar rev? Parece que no. Probamos con rev en -inter, 
+												con un programa "no conmutativo" y no devuelve el resultado 
+												esperado. Por lo tanto, por ahora, no utilizo rev ls *)
 		
 		(* external indica si es de run-time. En el caso que así lo sea, no se le pasa el static link *)
 		val ta' = if external then ta else fplev::ta
