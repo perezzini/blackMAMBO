@@ -31,39 +31,44 @@ structure tigerframe :> tigerframe = struct
 open tigertree
 
 type level = int			(* nivel de anidamiento *)
+datatype access = InFrame of int | InReg of tigertemp.label
 
 val fp = "FP"				(* frame pointer *)
 val sp = "SP"				(* stack pointer *)
 val rv = "RV"				(* return value  *)
 val ov = "OV"				(* overflow value (edx en el 386) *)
-val wSz = 8					(* word size in bytes *)
+
+val wSz = 4					(* word size in bytes *)
 val log2WSz = 2				(* base two logarithm of word size in bytes *)
+
 val fpPrev = 0				(* offset (bytes) from fp *)
 val fpPrevLev = 8			(* offset (bytes) from fp *)
-val argsInicial = 0			(* words *)
-val argsOffInicial = 0		(* words *)
-val argsGap = wSz			(* bytes *)
+
+val argsInicial = 0			(* words *) (* initial number of arguments *)
+val localsInicial = 0		(* words *) (* initial number of local variables *)
 val regInicial = 1			(* reg *)
-val localsInicial = 0		(* words *)
+
+val argsOffInicial = 0		(* words *)
+val accessListInitial = [InFrame (fpPrevLev)] (* Only SL access *)
+
+val argsGap = wSz			(* bytes *)
 val localsGap = ~4 			(* bytes *)
+
 val calldefs = [rv]
 val specialregs = [rv, fp, sp]
-val argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+val argregs = []
 val callersaves = []
 val calleesaves = []
 
-
 type register = string
 
-datatype access = InFrame of int | InReg of tigertemp.label
-
 type frame = {
-	name: tigertemp.label,
-	formals: access list ref,
-	locals: bool list,
-	actualArg: int ref,
-	actualLocal: int ref,
-	actualReg: int ref
+	name: tigertemp.label,		(* Name of the function corresponding to the frame *)
+	formals: access list ref,	(* Access list of the function corresponding arguments *)
+	locals: bool list,			(* List of booleans corresponding to escaped, or not escaped, function's local variables *)
+	actualArg: int ref,			(* Total number of the function's arguments *)
+	actualLocal: int ref,		(* Total number of the function's local variables in memory *)
+	actualReg: int ref 			(* Maybe it is not used... *)
 }
 
 datatype frag = PROC of {body: tigertree.stm, frame: frame}
@@ -72,7 +77,7 @@ datatype frag = PROC of {body: tigertree.stm, frame: frame}
 (* newFrame : {name: tigertemp.label, formals: bool list} -> frame *)
 fun newFrame{name, formals} = {
 	name=name,
-	formals=ref [],
+	formals=ref accessListInitial, (* Each frame contains a SL *)
 	locals=[],
 	actualArg=ref argsInicial,
 	actualLocal=ref localsInicial,
@@ -86,40 +91,60 @@ fun name(f: frame) = #name f
 fun string(l, s) = l^tigertemp.makeString(s)^"\n"
 
 (* formals : frame -> access list *)
-fun formals({formals=f, ...}: frame) = (InFrame(fpPrevLev))::(!f)
+fun formals({formals=f, ...}: frame) = !f
 
 (* maxRegFrame : frame -> int *)
 fun maxRegFrame(f: frame) = !(#actualReg f)
 
-(* Alloca un nuevo argumento. b indica si se retorna InReg (caso false) o InFrame (caso true) *)
+(* 	Alloca un nuevo argumento. b indica si se retorna InReg (caso false) 
+	o InFrame (caso true) 
+
+	allocArg : frame -> bool -> access 
+*)
+
+(* printAL : access list -> string list *)
+fun printAL [] = [""]
+	| printAL ((InFrame offset)::ac) = ("InFrame "^(Int.toString offset)^" ") :: (printAL ac)
+	| printAL ((InReg temporary)::ac) = ("InReg "^temporary^" ") :: (printAL ac)
+
 fun allocArg (f: frame) b = 
 	let
 		val a = case b of
 			true =>
 				let	
-					val ret = InFrame(!(#actualLocal f)+localsGap) (* keep local in memory *)
+					val ret = InFrame(!(#actualLocal f)+localsGap) (* reserve space in memory *)
 				in	
 					#actualLocal f := (!(#actualLocal f)-1); ret 
 				end
-			| false => InReg(tigertemp.newtemp()) (* save local in a temporary register *)
+			| false => InReg(tigertemp.newtemp()) (* reserve temporary register *)
 
 		val _ = #formals f := (!(#formals f)) @ [a]
-		val _ = print("Function name:"^(name f)^"\n")
-		val _ = print(Int.toString(List.length(!(#formals f)))^"\n")
+
+		(* DEBUGGING *)
+		val _ = print("\n**DEBUGGING from tigerframe.allocArg(). Function name:"^(name f))
+		val _ = print("\nNumber of formals = "^Int.toString(List.length(!(#formals f))))
+		val al =  printAL (!(#formals f))
+		val _ = print("\nFormals (access list) = "^concat al^"\n")
 	in
 		a
 	end
 
-(* Alloca una nueva variable local. b indica si se retorna InReg (caso false) o InFrame (caso true) *)
+(* 	Alloca una nueva variable local. b indica si se retorna InReg (caso false) o 
+	InFrame (caso true) 
+
+	allocLocal : frame -> bool -> access 
+*)
 fun allocLocal (f: frame) b = 
 	case b of
+		(* local var escapes *)
 		true =>
 			let	
-				val ret = InFrame(!(#actualLocal f)+localsGap) (* keep local in memory *)
+				val ret = InFrame(!(#actualLocal f)+localsGap) (* reserve space in memory *)
 			in	
 				#actualLocal f := (!(#actualLocal f)-1); ret 
 			end
-		| false => InReg(tigertemp.newtemp()) (* save local in a temporary register *)
+		(* local var does not escape *)
+		| false => InReg(tigertemp.newtemp()) (* reserve temporary register *)
 
 (* 	
 	(Used by tigertrans to turn a tigerframe.access into the 

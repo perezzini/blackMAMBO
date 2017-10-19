@@ -79,4 +79,7 @@ val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
 datatype frag = PROC of {body: tigertree.stm, frame: frame}
 	| STRING of tigertemp.label * string
 
+
+val printAL : access list -> string list
+
 end
