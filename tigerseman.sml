@@ -564,11 +564,14 @@ fun transExp(venv, tenv) =
 							SOME _ => false
 							| _ => true
 
+						(* Buscamos el level (frame) que creamos para la función en la etapa de inserción 
+							de funciones del batch en el environment *)
 						val level = case tabBusca(name, env) of
 							SOME (Func{level, ...}) => level
 							| _ => raise Fail "Error interno al analizar cuerpo de función"
 
-						(* Aumentamos un nivel *)
+						(* Aumentamos la pila de levels con el level recientemente encontrado (éste ahora 
+							estará en la "cabeza" de la pila) *)
 						val _ = pushLevel level
 
 						val venv'' = agregarParams params env
@@ -577,7 +580,7 @@ fun transExp(venv, tenv) =
 
 						val transFunctionDec = functionDec(expbody, level, isproc)
 
-						(* Volvemos al nivel anterior *)
+						(* Volvemos al level anterior *)
 						val _ = popLevel()
 					in
 						tybody
@@ -635,9 +638,6 @@ fun transExp(venv, tenv) =
 
 fun transProg ex =
 
-	(* Entrega2: "The result of calling transProg should be a 
-		tigertrans.frag list" - page 170
-	*)
 	let	val main =
 				(* AST expression inside a Tiger function that returns Unit *)
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
