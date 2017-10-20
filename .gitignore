@@ -1,9 +1,10 @@
-tiger
 *.uo
 *.ui
 *.o
 *.bak
-*.output
-res/
+res
 doc/
+tiger
+tests/
+*.output
 debug/
