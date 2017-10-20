@@ -102,10 +102,18 @@ fun maxRegFrame(f: frame) = !(#actualReg f)
 	allocArg : frame -> bool -> access 
 *)
 
-(* printAL : access list -> string list *)
-fun printAL [] = [""]
-	| printAL ((InFrame offset)::ac) = ("InFrame "^(Int.toString offset)^" ") :: (printAL ac)
-	| printAL ((InReg temporary)::ac) = ("InReg "^temporary^" ") :: (printAL ac)
+(* printAL : access list -> string *)
+fun printAL al = 
+	let
+		fun printAc [] = [""]
+			| printAc ((InFrame offset)::[]) = ("InFrame "^(Int.toString offset)) :: (printAc [])
+			| printAc ((InReg temporary)::[]) = ("InReg "^temporary) :: (printAc [])
+			| printAc ((InFrame offset)::ac) = ("InFrame "^(Int.toString offset)^", ") :: (printAc ac)
+			| printAc ((InReg temporary)::ac) = ("InReg "^temporary^", ") :: (printAc ac)
+		val al' = printAc al
+	in
+		"["^concat al'^"]"
+	end
 
 fun allocArg (f: frame) b = 
 	let
@@ -123,8 +131,7 @@ fun allocArg (f: frame) b =
 		(* DEBUGGING *)
 		val _ = print("\n**DEBUGGING from tigerframe.allocArg(). Function name:"^(name f))
 		val _ = print("\nNumber of formals = "^Int.toString(List.length(!(#formals f))))
-		val al =  printAL (!(#formals f))
-		val _ = print("\nFormals (access list) = "^concat al^"\n")
+		val _ = print("\nAccess list = "^printAL (!(#formals f))^"\n")
 	in
 		a
 	end

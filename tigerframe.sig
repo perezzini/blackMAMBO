@@ -80,6 +80,6 @@ datatype frag = PROC of {body: tigertree.stm, frame: frame}
 	| STRING of tigertemp.label * string
 
 
-val printAL : access list -> string list
+val printAL : access list -> string
 
 end
