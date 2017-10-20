@@ -639,12 +639,15 @@ fun transExp(venv, tenv) =
 fun transProg ex =
 
 	let	val main =
-				(* AST expression inside a Tiger function that returns Unit *)
+				(* AST expression inside a Tiger function that returns an integer *)
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
 								result=SOME ("int"), body=ex}, 0)]],
 						body=UnitExp 0}, 0)
-		val {ty=tyt, exp=expt} = transExp(tab_vars, tab_tipos) main (* use 'ex' to get real type of input expression *)
+		val {ty=tyt, exp=expt} = transExp(tab_vars, tab_tipos) main (* use 'ex' to get real type of input expression. 
+																	In case 'main' it's passed as a parameter, it'll 
+																	return Unit as final type of expression. *)
 	in	
+		(* DEBUGGING *)
 		(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
 		print "\n")
 	end
