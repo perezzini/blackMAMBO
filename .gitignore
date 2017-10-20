@@ -5,8 +5,6 @@
 res
 doc/
 tiger
-tests/good/
-tests/type/
-tests/syntax/
+tests/
 *.output
 debug/
