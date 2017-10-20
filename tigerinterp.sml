@@ -211,7 +211,7 @@ struct
 
 		fun getstrFun(args) = 
 		let
-			val str = TextIO.inputLine TextIO.stdIn
+			val str = valOf(TextIO.inputLine TextIO.stdIn)
 		in
 			storeString str
 		end
@@ -222,7 +222,7 @@ struct
 				("_checkIndexArray", checkIndexArray),
 				("_allocRecord", allocRecord),
 				("_checkNil", checkNil),
-				("_stringcmp", stringCompare),
+				("_stringCompare", stringCompare),
 				("print", printFun),
 				("flush", flushFun),
 				("ord", ordFun),
@@ -362,5 +362,5 @@ struct
 			in
 				rv
 			end
-	in (print("Comienzo de ejecución...\n"); evalFun("_tigermain", []); print("Fin de ejecución.\n")) end
+	in (print("\n**INTER: Comienzo de ejecución...\n"); evalFun("_tigermain", []); print("\n**INTER: Fin de ejecución.\n")) end
 end

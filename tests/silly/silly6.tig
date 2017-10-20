@@ -1,0 +1,1 @@
+(print(substring("hola", 1, 2));0)

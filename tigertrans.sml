@@ -14,26 +14,42 @@ type level = {parent:frame option,
 				
 type access = tigerframe.access
 
+(* frag = tigerframe.frag *)
 type frag = tigerframe.frag
 val fraglist = ref ([]: frag list)
 
 val actualLevel = ref ~1 (* _tigermain debe tener level = 0. *)
 
+(* getActualLev : unit -> int *)
 fun getActualLev() = !actualLevel
 
+(* outermost : level *)
 val outermost: level = {parent = NONE,
 						frame = newFrame{name="_tigermain", formals=[]}, 
 										level=getActualLev()}
 
+(* newLevel : {parent: level, name: tigertemp.label,
+				formals: bool list} -> level *)
 fun newLevel{parent={parent, frame, level}, name, formals} =
-	{parent=SOME frame,
-	frame=newFrame{name=name, formals=formals},
-	level=level+1}
+	let
+		(* Debugging *)
+		val _ = print("\n**DEBUGGING from tigertrans.newLevel. Function name: "^name^"\n")
+		val _ = print(name^"'s function parent name: "^tigerframe.name (frame)^"\n")
+		val _ = print(name^"'s function parent level number: "^Int.toString(level)^"\n")
+	in
+		{parent=SOME frame,
+		frame=newFrame{name=name, 
+						formals=formals},
+		level=level+1}
+	end
 
+(* allocArg : level -> bool -> access *)
 fun allocArg{parent, frame, level} b = tigerframe.allocArg frame b
 
+(* allocLocal : level -> bool -> access *)
 fun allocLocal{parent, frame, level} b = tigerframe.allocLocal frame b
 	
+(* formals : level -> access list *)
 fun formals{parent, frame, level} = tigerframe.formals frame
 
 (* Tres tipos de expresiones *)
@@ -96,16 +112,22 @@ fun unCx (Nx s) = raise Fail ("Error (unCx(Nx..)). Nunca debe suceder")
 	| unCx (Ex (CONST _)) = (fn (t,f) => JUMP(NAME t, [t])) (* caso: true *)
 	| unCx (Ex e) = (fn (t,f) => CJUMP(NE, e, CONST 0, t, f)) (* caso: evaluar expresión e *)
 
+(* Ir : frag list -> string
+	Prints a frag list 
+*)
 fun Ir(e) =
-	let	fun aux(Ex e) = tigerit.tree(EXP e)
-		| aux(Nx s) = tigerit.tree(s)
-		| aux _ = raise Fail "bueno, a completar!"
+	let	
+		fun aux(Ex e) = tigerit.tree(EXP e)
+			| aux(Nx s) = tigerit.tree(s)
+			| aux _ = raise Fail "bueno, a completar!"
+
 		fun aux2(PROC{body, frame}) = aux(Nx body)
-		| aux2(STRING(l, "")) = l^":\n"
-		| aux2(STRING("", s)) = "\t"^s^"\n"
-		| aux2(STRING(l, s)) = l^":\t"^s^"\n"
+			| aux2(STRING(l, "")) = l^":\n"
+			| aux2(STRING("", s)) = "\t"^s^"\n"
+			| aux2(STRING(l, s)) = l^":\t"^s^"\n"
+
 		fun aux3 [] = ""
-		| aux3(h::t) = (aux2 h)^(aux3 t)
+			| aux3(h::t) = (aux2 h)^(aux3 t)
 	in	
 		aux3 e 
 	end
@@ -124,24 +146,30 @@ in
 			| NONE => raise Fail "break incorrecto!"			
 end
 
-(* Global list of frag ("fragments") *)
-val datosGlobs = ref ([]: frag list)
+(* Global list of fragments *)
+val datosGlobs = fraglist
 
+(*	"procEntryExit has the side effect of remembering a PROC
+	fragment" - page 170
+*)
 fun procEntryExit{level: level, body} =
-	let	val label = STRING(name(#frame level), "")
+	let	
+		val label = STRING(name(#frame level), "") (* name : frame -> tigertemp.label *)
 		val body' = PROC{frame= #frame level, body=unNx body}
 		val final = STRING(";;-------", "")
 	in	
-		datosGlobs:=(!datosGlobs@[label, body', final]) 
+		datosGlobs:=(!datosGlobs @ [label, body', final]) 
 	end
 
+(* getResult : unit -> frag list *)
 fun getResult() = !datosGlobs
 
 (* Following static links - page 156 
 	"When a variable x is declared at an outer level of static scope, 
 	static links must be used. To construct this expression, we need 
 	the level l_f of the function f in which x is used, and the level 
-	l_g in which x is declared" *)
+	l_g in which x is declared"
+*)
 fun followSL 0 = TEMP(tigerframe.fp)
 	| followSL n = MEM(BINOP(PLUS, CONST tigerframe.fpPrevLev, followSL (n-1)))
 
@@ -153,7 +181,7 @@ fun stringLen s =
 		aux(explode s) 
 	end
 
-(* "A string literal in Tiger is the constant addess of a segment of memory initialized 
+(* "A string literal in Tiger is the constant address of a segment of memory initialized 
 	to the proper characters. In assembly lang a label is used to refer to this address 
 	from the middle of some sequence of instructions. At some other place in the 
 	assembly-lang program, the definition of that label appears, followed by the 
@@ -161,12 +189,15 @@ fun stringLen s =
 	appropriate characters" - page 163 *)
 (* stringExp : string -> exp *)
 fun stringExp(s: string) =
-	let	val l = newlabel()
-		val len = ".long "^makestring(stringLen s)
-		val str = ".string \""^s^"\""
-		val _ = datosGlobs:=(!datosGlobs @ [STRING(l, len), STRING("", str)])
-	in	
-		Ex(NAME l) 
+    let 
+    	fun format [] = []
+            | format (#"\\"::(#"x"::(#"0"::(#"a"::xs)))) = (#"\n"::format xs)
+            | format (x::xs) = x :: (format xs) (* otros casos *)
+    	val l = newlabel()
+        val str = (implode o format o explode) s
+        val _ = datosGlobs:=(!datosGlobs @ [STRING(l, str)])
+    in  
+    	Ex(NAME l) 
 	end
 
 fun preFunctionDec() =
@@ -175,7 +206,9 @@ fun preFunctionDec() =
 
 (* functionDec : exp * level * bool -> exp *)
 fun functionDec(e, l, proc) =
-	let	val body =
+	let	
+		(* body pertenece a tigertree.stm *)
+		val body =
 				if proc then unNx e
 				else MOVE(TEMP rv, unEx e)
 		val body' = procEntryExit1(#frame l, body)
@@ -250,7 +283,7 @@ fun subscriptVar(arr, ind) =
 	in
 		Ex(ESEQ(seq[MOVE(TEMP ra, a),
 					MOVE(TEMP ri, i),
-					EXP(externalCall("_checkIndex", [TEMP ra, TEMP ri]))],
+					EXP(externalCall("_checkIndexArray", [TEMP ra, TEMP ri]))],
 					MEM(BINOP(PLUS, TEMP ra,
 						BINOP(MUL, TEMP ri, CONST tigerframe.wSz)))))
 		(* Devuelve MEM(...) para hacer fetch del elemento del array en cuestión *)
@@ -260,6 +293,7 @@ fun subscriptVar(arr, ind) =
 fun recordExp l =
 	let
 		(* a{f1 = e1, ..., fn = en} *)
+
 		(* "The simplest way to create a record is to call an external memory-allocation 
 		function that returns a pointer to an n-word area into a new temp r. Then a series 
 		of MOVE trees can init offsets 0, 1W, 2W, ..., (n-1)W from r with translations of 
@@ -289,7 +323,7 @@ fun arrayExp{size, init} =
 		val s = unEx size
 		val i = unEx init
 	in
-		Ex(externalCall("_allocArray", [s, i]))
+		Ex(externalCall("_initArray", [s, i]))
 	end
 
 (* callExp : tigertemp.label * bool * bool * level * exp list -> exp *)
@@ -312,15 +346,14 @@ fun callExp (name, external, isproc, lev:level, ls) =
 				- lev is the level of the function calling f (the level of the callee function)
 				- args: list of formals that f takes
 				- isproc: tells if f is a proc or not
-				- e: si es una external call
+				- e: f is an external call (or not)
 
 			"Static links: Whenever a function f is called, it is passed a pointer to the stack 
 			frame of the current (most recently entered - the function statically enclosing f) 
 			activation of the function g that immediatly encloses f in the text of the program" 
 			- page 133. Here, f is the CALLEE function and g is the CALLER function.
-		*)
 
-		(* El principal problema aquí es generar el SL. Veamos las reglas que tendremos que 
+		El principal problema aquí es generar el SL. Veamos las reglas que tendremos que 
 		usar, todo depende de los niveles de la llamante y la llamada:
 				1er CASO: nivel_llamante = nivel_llamada
 							SL_llamada = SL_llamante
@@ -338,19 +371,33 @@ fun callExp (name, external, isproc, lev:level, ls) =
 			| traerFP n = MEM(BINOP(PLUS, traerFP(n - 1), CONST fpPrevLev))
 
 		val calleeLev = #level lev
-		(* getActualLev(): level of the caller function *)
+		val callerLev = getActualLev()
 
-		val fplev = if calleeLev = getActualLev() then 
+		val callerName = case #parent lev of
+			SOME f => tigerframe.name f
+			| _ => "NONE"
+
+		(* Debugging *)
+		val _ = print("\n**DEBUGGING from tigertrans.callExp. Function name: "^name^"\n")
+		val _ = print("callee ("^name^") level = "^Int.toString(calleeLev)^"\n")
+		val _ = print("caller ("^callerName^") level = "^Int.toString(callerLev)^"\n")
+
+		val fplev = if calleeLev = callerLev then 
 						MEM(BINOP(PLUS, TEMP tigerframe.fp, CONST tigerframe.fpPrevLev)) (* 1er CASO *)
 					else 
-						if calleeLev < getActualLev() then 
-							traerFP (getActualLev() - (#level lev) + 1) (* 3er CASO *)
+						if calleeLev < callerLev then 
+							traerFP (callerLev - (#level lev) + 1) (* 3er CASO *)
 						else 
 							TEMP tigerframe.fp (* 2do CASO *)
 
-
-		fun preparaArgs [] (rt, re) = (rt, re) (* rt: constantes, labels y temps. 
-													re: expresiones a evaluar (se devuelve un exp en un temp) *)
+		(* Usamos la convención de llamada de C, junto con la exigencia de Tiger.
+			Resumiendo:
+			- efectos laterales de izq a der
+			- args en stack de der a izq
+		*)
+		fun preparaArgs [] (rt, re) = (rt, re) (* 	rt: constantes, labels y temps. 
+													re: expresiones a evaluar (se devuelve un exp en un temp) 
+												*)
 			| preparaArgs (h::t) (rt, re) = case h of
 				Ex(CONST s) => preparaArgs t ((CONST s)::rt, re)
 				| Ex(NAME s) => preparaArgs t ((NAME s)::rt, re)
@@ -363,7 +410,9 @@ fun callExp (name, external, isproc, lev:level, ls) =
 						preparaArgs t ((TEMP t')::rt, (MOVE(TEMP t', e))::re)
 					end
 
-		val (ta, ls') = preparaArgs (rev ls) ([], [])
+		val (ta, ls') = preparaArgs ls ([], []) (* aplicar rev? Parece que no. Probamos con rev en -inter, 
+												con un programa "no conmutativo" y no devuelve el resultado 
+												esperado. Por lo tanto, por ahora, no utilizo rev ls *)
 		
 		(* external indica si es de run-time. En el caso que así lo sea, no se le pasa el static link *)
 		val ta' = if external then ta else fplev::ta
@@ -372,17 +421,11 @@ fun callExp (name, external, isproc, lev:level, ls) =
 			Nx(seq(ls' @ [EXP(CALL(NAME name, ta'))]))
 		else
 			let
-				(*
-					Para escribir en assembler CALL f(4+3) se debe:
-						1. Computar la suma
-						2. Guardarla en un temporario t
-						3. Llamar CALL f con el registro t)
-				*)
 				val tmp = newtemp()
 			in
 				(* Devolvemos el resultado en rv (return value del machine-target) *)
 				Ex (ESEQ (seq(ls' @ [EXP(CALL(NAME name, ta')),
-                                   MOVE(TEMP tmp,TEMP tigerframe.rv)]), TEMP tmp))
+                                   MOVE(TEMP tmp, TEMP tigerframe.rv)]), TEMP tmp))
 			end
 	end
 
@@ -437,37 +480,38 @@ fun whileExp {test: exp, body: exp, lev:level} =
 
 (* forExp : {lo: exp, hi: exp, var: exp, body: exp} -> exp *)
 fun forExp {lo, hi, var, body} =
-	let
-		val var' = unEx var
-		val (l1, l2, lsal) = (newlabel(), newlabel(), newlabel())
-	in
-		case hi of
-			Ex(CONST n) => Nx(seq[MOVE(var', unEx lo),
-									CJUMP(LE, var', CONST n, l2, lsal),
-									LABEL l2,
-										unNx body,
-										CJUMP(EQ, var', CONST n, lsal, l1),
-									LABEL l1,
-										MOVE(var', BINOP(PLUS, var', CONST 1)),
-										JUMP(NAME l2, [l2]),
-									LABEL lsal])
-			(* hi no es CONST *)
-			| _ =>
-				let
-					val t = newtemp()
-				in
-					Nx(seq[MOVE(var', unEx lo),
-							MOVE(TEMP t, unEx hi),
-							CJUMP(LE, var', TEMP t, l2, lsal),
-							LABEL l2,
-								unNx body,
-								CJUMP(EQ, var', TEMP t, lsal, l1),
-							LABEL l1,
-								MOVE(var', BINOP(PLUS, var', CONST 1)),
-								JUMP(NAME l2, [l2]),
-							LABEL lsal])
-				end
-	end
+    let 
+        val var' = unEx var
+        val (l1, l2, lsal) = (newlabel(), newlabel(), topSalida())
+    in
+        case hi of
+          Ex (CONST n) =>
+               Nx (seq [MOVE (var', unEx lo),
+                        CJUMP (LE, var', CONST n, l2, lsal),
+                        LABEL l2, 
+                          unNx body,
+                          CJUMP (EQ, var', CONST n, lsal, l1),
+                        LABEL l1, 
+                          MOVE (var', BINOP (PLUS, var', CONST 1)),
+                          JUMP (NAME l2, [l2]),
+                        LABEL lsal])
+
+        | _ => (* hi no es CONST *)
+            let 
+                val t_hi = newtemp()
+            in 
+               Nx (seq [MOVE (var', unEx lo),
+                        MOVE(TEMP t_hi, unEx hi),
+                        CJUMP (LE, var', TEMP t_hi, l2, lsal),
+                        LABEL l2, 
+                          unNx body,
+                          CJUMP (EQ, var', TEMP t_hi, lsal, l1),
+                        LABEL l1, 
+                          MOVE (var', BINOP (PLUS, var', CONST 1)),
+                          JUMP (NAME l2, [l2]),
+                        LABEL lsal])
+            end
+    end
 
 (* La rama del IF computa un valor *)
 (* ifThenExp : {test: exp, then': exp} -> exp *)
@@ -592,7 +636,50 @@ fun ifThenElseExpUnit {test, then', else'} =
 				LABEL fl])
 	end
 
-(* assignExp : {var: exp, exp:exp}-> exp *)
+(*
+fun ifThenExp{test, then'} =
+    let
+        val (t, f) = (temp.newlabel(),temp.newlabel())
+        val test' = unCx(test)
+    in
+        Nx( seq ([test' (t, f), 
+                  LABEL t, 
+                  unNx(then'), 
+                  LABEL f]))
+    end
+
+fun ifThenElseExp {test, then', else'} =
+    let
+        val (t, f, final) = (temp.newlabel(), temp.newlabel(), temp.newlabel())
+        val temp = temp.newtemp()
+        val test' = unCx(test)
+    in
+        Ex (ESEQ (seq ([test' (t, f), 
+                        LABEL t, 
+                        MOVE(TEMP temp, unEx(then')), 
+                        JUMP(NAME final, [final]), 
+                        LABEL f, 
+                        MOVE(TEMP temp, unEx(else')), 
+                        LABEL final]), 
+                  TEMP temp))
+    end
+
+fun ifThenElseExpUnit {test, then', else'} =
+    let
+        val (t, f, final) = (temp.newlabel(), temp.newlabel(), temp.newlabel())
+        val test' = unCx(test)
+    in
+        Nx (seq ([test' (t, f), 
+                  LABEL t, 
+                  unNx(then'), 
+                  JUMP (NAME final, [final]), 
+                  LABEL f, 
+                  unNx(else'), 
+                  LABEL final]))
+    end
+*)
+
+(* assignExp : {var: exp, exp: exp} -> exp *)
 fun assignExp{var, exp} =
 	let
 		val v = unEx var
@@ -653,7 +740,7 @@ fun binOpStrExp {left,oper,right} =
 
 		fun cond oper = fn (t, f) => 
 			CJUMP(oper,
-				tigerframe.externalCall("_stringEqual", [l, r]), 
+				tigerframe.externalCall("_stringCompare", [l, r]), 
 				CONST 0,
 				t, 
 				f)

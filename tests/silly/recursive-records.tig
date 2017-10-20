@@ -1,0 +1,10 @@
+let
+
+	type rectype = {name : string, id : int, r: rectype}
+	var rr:rectype := rectype{name="hello", id=0, r=rectype{name="helloInside", id=1, r=nil}}
+
+	var record:rectype := rr.r
+
+in
+	record.r.r.r.r.id
+end

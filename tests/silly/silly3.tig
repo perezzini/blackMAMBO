@@ -1,0 +1,13 @@
+let
+	var x : int := 10 /* escaped var */
+
+	function f(a : int) : int =
+		let
+			function id(i : int) : int = i
+		in
+			id(a) + x
+			/* id(x) + x */
+		end
+in
+	f(43)
+end

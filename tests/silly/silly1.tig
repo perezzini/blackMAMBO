@@ -1,0 +1,7 @@
+let
+	var xx := 6
+	function id():int = (print(chr(xx + 65)); xx)
+	function id2(x:int):int = x
+in 
+	print(chr(id()+2 + 65));0
+end

@@ -2,11 +2,13 @@
 let
    /* define a tree */
   type tree ={key : int, children : treelist}
+  /* Si se corta el batch, habrá un error interno */
+  type treelist = {hd : tree, tl : treelist, num: int}
 
-  var d : int :=0
+  var t : tree := tree{key=2, children=treelist{hd=nil, tl=nil, num=3}}
 
-  type treelist = {hd : tree, tl : treelist}
+  var treel:treelist := t.children
 
 in
-  d
+  treel.tl.tl.tl.num
 end

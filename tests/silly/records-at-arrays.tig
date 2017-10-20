@@ -1,0 +1,8 @@
+let
+	type record = {id: int, str: string}
+	type arr = array of record
+
+	var x:arr := arr[50] of record{id=0, str="hello"}
+in
+	x[100]
+end
