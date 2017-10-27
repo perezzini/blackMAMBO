@@ -1,4 +1,4 @@
 signature tigercodegen = 
 sig
-	val codegen : tigerframe.frame -> tigertree.stm -> tigerassem.instr list
+	val codegen : tigertree.stm -> tigerassem.instr list
 end
