@@ -16,14 +16,18 @@ struct
 	open tigerassem
 	open tigertree
 
-	fun intToString i = if i < 0 then "-"^Int.toString(~i) else Int.toString(i)
+	fun intToString i = if i < 0 
+						then 
+							"-"^Int.toString(~i) 
+						else 
+							Int.toString(i)
 
 	(* codegen : tigerframe.frame -> tigertree.stm -> tigerassem.instr list *)
 	(* Assuming that 'stm' parameter is canonized *)
-	fun codegen stm =
+	fun codegen (stm : tigertree.stm) : instr list =
 		let
 			val ilist = ref ([] : instr list) 			(* list of assembly-lang instructions *)
-			
+
 			fun emit instr = (ilist := instr::(!ilist)) (* Accumulates a list of instructions to 
 														be returned later *)
 			fun generateTmp gen = 
@@ -240,44 +244,48 @@ struct
 						let
 							fun munchArgsStack [] = []								(* Place parameters in memory *)
 								| munchArgsStack (a::ass) = 
-									let val _ = case a of
-										CONST i => emit(OPER{
-												assem="pushq $"^intToString i^"\n",
-												src=[],
-												dst=[],
-												jump=NONE
-											})
-										| NAME l => emit(OPER{
-												assem="pushq $"^l^"\n",
-												src=[],
-												dst=[],
-												jump=NONE
-											})
-										| TEMP t => emit(OPER{
-												assem="pushq `s0\n",
-												src=[t],
-												dst=[],
-												jump=NONE
-											})
-										| MEM(TEMP t) => emit(OPER{
-												assem="pushq (`s0)\n",
-												src=[t],
-												dst=[],
-												jump=NONE
-											})
-										| MEM(BINOP(PLUS, e, CONST i)) => emit(OPER{
-												assem="pushq "^intToString i^"(`s0)\n",
-												src=[munchExp e],
-												dst=[],
-												jump=NONE
-											})
-										| MEM(e) => emit(OPER{
-												assem="pushq (`s0)\n",
-												src=[munchExp e],
-												dst=[],
-												jump=NONE
-											})
-										| _ => raise Fail "Error - munchArgsStack()"
+									let 
+										val _ = case a of
+											CONST i => emit(OPER{
+													assem="pushq $"^intToString i^"\n",
+													src=[],
+													dst=[],
+													jump=NONE
+												})
+											| NAME l => emit(OPER{
+													assem="pushq $"^l^"\n",
+													src=[],
+													dst=[],
+													jump=NONE
+												})
+											| TEMP t => emit(OPER{
+													assem="pushq `s0\n",
+													src=[t],
+													dst=[],
+													jump=NONE
+												})
+											| MEM(TEMP t) => emit(OPER{
+													assem="pushq (`s0)\n",
+													src=[t],
+													dst=[],
+													jump=NONE
+												})
+											| MEM(BINOP(PLUS, e, CONST i)) => emit(OPER{
+													assem="pushq "^intToString i^"(`s0)\n",
+													src=[munchExp e],
+													dst=[],
+													jump=NONE
+												})
+											| MEM(e) => emit(OPER{
+													assem="pushq (`s0)\n",
+													src=[munchExp e],
+													dst=[],
+													jump=NONE
+												})
+											| _ => raise Fail "Error - munchArgsStack()"
+									in
+										munchArgsStack ass
+									end
 
 							fun munchArgsReg [] _ = []
 								| munchArgsReg ass [] = munchArgsStack (rev ass)	(* Runned out of registers to allocate arguments, so store them in memory applying C calling convention *)
@@ -287,7 +295,6 @@ struct
 									in
 										r::(munchArgsReg ass rss)					(* Save list of registers *)
 									end
-
 						in
 							munchArgsReg args tigerframe.argregs					(* Attempt to store function's arguments at machine available registers if possible *)
 						end
@@ -338,83 +345,83 @@ struct
 
 				| munchExp(BINOP(PLUS, CONST i, e)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="addq $"^intToString i^", `d0\n"
+								assem="addq $"^intToString i^", `d0\n",
 								src=[r],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, NAME l, e)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="addq $"^l^", `d0\n",
 								src=[r],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, TEMP t, e)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="addq `s1, `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, MEM(TEMP t), e)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="addq (`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, MEM(BINOP(PLUS, CONST i, TEMP t)), e)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="addq "^intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, MEM(BINOP(PLUS, TEMP t, CONST i)), e)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="addq "^intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, MEM e1, e2)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e2));
+						(munchStm(MOVE(TEMP r, e2));
 						emit(OPER{
 								assem="addq (`s1), `d0\n",
 								src=[r, munchExp e1],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(PLUS, e1, e2)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e2));
+						(munchStm(MOVE(TEMP r, e2));
 						emit(OPER{
 								assem="addq `s1, `d0\n",
 								src=[r, munchExp e1],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 
 				(* MINUS op cases.
@@ -422,83 +429,83 @@ struct
 
 				| munchExp(BINOP(MINUS, e, CONST i)) = 
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="subq $"^intToString i^", `d0\n",
 								src=[r],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e, NAME l)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="subq $"^l^", `d0\n",
 								src=[r],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e, TEMP t)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="subq `s1, `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e, MEM(TEMP t))) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="subq (`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE	
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e, MEM(BINOP(PLUS, CONST i, TEMP t)))) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="subq "^intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e, MEM(BINOP(PLUS, TEMP t, CONST i)))) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e));
+						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
 								assem="subq "^intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e1, MEM e2)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e1));
+						(munchStm(MOVE(TEMP r, e1));
 						emit(OPER{
 								assem="subq (`s1), `d0\n",
 								src=[r, munchExp e2],
 								dst=[r],
 								jump=NONE	
-							}))
+							})))
 
 				| munchExp(BINOP(MINUS, e1, e2)) =
 					generateTmp(fn r => 
-						munchStm(MOVE(TEMP r, e1));
+						(munchStm(MOVE(TEMP r, e1));
 						emit(OPER{
 								assem="subq `s1, `d0\n",
 								src=[r, munchExp e2],
 								dst=[r],
 								jump=NONE
-							}))
+							})))
 
 
 				(* DIV op cases *)
@@ -510,16 +517,16 @@ struct
 						val tmpe2 = munchExp e2						(* Temporary containing expression e2 *)
 					in
 						generateTmp(fn r => 
-							munchStm(MOVE(TEMP tigerframe.rax, e1));
+							(munchStm(MOVE(TEMP tigerframe.rax, e1));
 							emit(OPER{
-									assem="cqo\n",					(* Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
+									assem="cqo\n",					(* cqo: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
 																	broadcasts the sign bit of RAX into every bit of RDX *)
 									src=[tigerframe.rax],
 									dst=[tigerframe.rdx],
 									jump=NONE
 								});
 							emit(OPER{
-									assem="idivq `s2\n",			(* Signed divide RDX:RAX by tmpe2. Quotient stored in RAX. Remainder stored in RDX *)
+									assem="idivq `s2\n",			(* idivq: Signed divide RDX:RAX by tmpe2. Quotient stored in RAX. Remainder stored in RDX *)
 									src=[tigerframe.rax,
 										tigerframe.rdx,
 										tmpe2],
@@ -527,13 +534,12 @@ struct
 										tigerframe.rdx],
 									jump=NONE
 								});
-							munchStm(MOVE(TEMP r, tigertemp.rax)))	(* Move result of division to RAX *)
+							munchStm(MOVE(TEMP r, tigerframe.rax))))	(* Move result of division to RAX *)
 					end
 
 				| munchExp(BINOP(_,_,_)) = raise Fail "Error - munchExp(): operación binaria no soportada"
 
 		in
-			(munchStm stm;
-			rev (!ilist))
+			(munchStm stm; rev (!ilist))
 		end
 end
