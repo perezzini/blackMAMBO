@@ -2,7 +2,7 @@ signature tigergraph =
 sig
     type graph
     type node
-    (*type 'a tableNodes                               Associates information with nodes *)
+    type 'a tableNodes                              (* Associates information with nodes *)
     
     val nodes: graph -> node list                   (* Returns nodes within a graph *)
     val succ: node -> node list

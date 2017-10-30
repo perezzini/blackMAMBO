@@ -18,6 +18,8 @@ struct
 
   type node = graph * node'                                                       (* Contains a noderep allong with its assigned number within a graph *)
 
+  type 'a tableNodes = (node, 'a) tigertab.Tabla
+
   fun eq((_,a),(_,b)) = a=b                                                       (* Two nodes are equal if their assigned number are equal *)
 
   fun augment (g: graph) (n: node') : node = (g,n)                                (* Augments a graph with a new node *)
