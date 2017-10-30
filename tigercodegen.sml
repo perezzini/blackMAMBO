@@ -1,7 +1,7 @@
 structure tigercodegen :> tigercodegen =
 struct
 
-	(* NOTE: instruction selection of x86_64 architecture; AT&T syntax (GAS syntax)
+	(* NOTE: x86_64 instruction selection; AT&T syntax (GAS syntax)
 	The main advantage of using this syntax is its compatibility with the GCC inline assembly syntax
 
 	The fundamental data types are (signed/unsigned integers): 
@@ -221,23 +221,31 @@ struct
 
 				| munchStm(EXP e) = (munchExp e; ())	(* Evaluate e and discard the result *)
 
-			and saveCallerSaves() = ()
-						(*map (fn r => 
-							OPER{
-								assem="pushq `s0 # SAVE CALLER-SAVED REGISTER\n",
-								src=[r],
-								dst=[],
-								jump=NONE
-							}) tigerframe.callersaves*)
+			and saveCallerSaves() =
+						let
+							fun emitcdefs s =
+								emit(OPER{
+										assem="pushq `s0 # SAVE CALLER-SAVED REGISTER\n",
+										src=[s],
+										dst=[],
+										jump=NONE
+									})
+						in
+							List.map emitcdefs (tigerframe.callersaves)
+						end
 
-			and restoreCallerSaves() = ()
-						(*map (fn r => 
-							OPER{
-								assem="popq `s0 # SAVE CALLER-SAVED REGISTER\n",
-								src=[r],
-								dst=[],
-								jump=NONE
-							}) tigerframe.callersaves*)
+			and restoreCallerSaves() =
+						let
+							fun emitcdefs s =
+								emit(OPER{
+										assem="popq `s0 # RESTORE CALLER-SAVED REGISTER\n",
+										src=[],
+										dst=[s],
+										jump=NONE
+									})
+						in
+							List.app emitcdefs (List.rev (tigerframe.callersaves))
+						end
 
 
 			and munchArgs args =
@@ -534,7 +542,7 @@ struct
 										tigerframe.rdx],
 									jump=NONE
 								});
-							munchStm(MOVE(TEMP r, tigerframe.rax))))	(* Move result of division to RAX *)
+							munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))	(* Move result of division to result temp *)
 					end
 
 				| munchExp(BINOP(_,_,_)) = raise Fail "Error - munchExp(): operación binaria no soportada"
