@@ -28,7 +28,8 @@ EXEFILE=
 
 GRALOBJS= tigerabs.uo tigergrm.uo tigerlex.uo tigermain.uo \
 	tigernlin.uo tigerpp.uo tigerescap.uo tigertab.uo tigerseman.uo tigertemp.uo topsort.uo tigertree.uo \
-	tigerframe.uo tigertrans.uo tigerit.uo tigerpila.uo tigerinterp.uo tigertopsort.uo tigermuestratipos.uo tigercanon.uo
+	tigerframe.uo tigertrans.uo tigerit.uo tigerpila.uo tigerinterp.uo tigertopsort.uo tigermuestratipos.uo tigercanon.uo \
+	tigerassem.uo tigercodegen.uo tigergraph.uo
 
 all: tiger
 
@@ -68,6 +69,7 @@ depend: tigerabs.sml tigergrm.sml tigerlex.sml tigermain.sml \
 	$(MOSMLTOOLS)/mosmldep >> Makefile
 
 ### DO NOT DELETE THIS LINE
+tigerassem.uo: tigertemp.ui 
 tigerpila.uo: tigerpila.ui 
 tigertree.uo: tigertemp.ui 
 tigertemp.uo: tigertemp.ui 
@@ -92,13 +94,17 @@ tigertrans.uo: tigertrans.ui tigertree.uo tigerpila.ui tigerframe.ui \
     tigerit.uo tigertemp.ui tigerabs.uo 
 tigerescap.uo: tigerescap.ui tigertab.ui tigerabs.uo 
 tigermuestratipos.uo: tigermuestratipos.ui tigertips.uo 
-tigerframe.uo: tigerframe.ui tigertree.uo tigertemp.ui 
+tigerframe.uo: tigerframe.ui tigertree.uo tigerassem.uo tigertemp.ui 
+tigergraph.uo: tigergraph.ui tigertemp.ui 
 tigerit.uo: tigertree.uo tigertab.ui 
 tigergrm.ui: tigerabs.uo 
+tigercodegen.uo: tigercodegen.ui tigertree.uo tigerframe.ui tigerassem.uo \
+    tigertemp.ui 
+tigercodegen.ui: tigertree.uo tigerassem.uo 
 tigersres.uo: tigertab.ui tigertips.uo tigertemp.ui tigerabs.uo \
     tigertrans.ui 
 tigerlex.uo: tigergrm.ui tigernlin.uo 
 tigertrans.ui: tigertree.uo tigerframe.ui tigertemp.ui tigerabs.uo 
 tigerpp.uo: tigerabs.uo 
 tigercanon.ui: tigertree.uo tigertemp.ui 
-tigerframe.ui: tigertree.uo tigertemp.ui 
+tigerframe.ui: tigertree.uo tigerassem.uo tigertemp.ui 
