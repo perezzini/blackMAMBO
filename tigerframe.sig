@@ -6,10 +6,21 @@ signature tigerframe =
 sig
 
 type frame (* Holds info about formal parameters and local variables allocated in this frame *)
+
 type register = string
+
 val rv : tigertemp.temp
 val ov : tigertemp.temp
 val fp : tigertemp.temp
+val sp : tigertemp.temp
+val rax : tigertemp.temp
+val rdx : tigertemp.temp
+
+val calldefs : tigertemp.temp list
+val callersaves : tigertemp.temp list
+val argregs : tigertemp.temp list
+
+
 datatype access = InFrame of int 
 				| InReg of tigertemp.label (* Describes formals and locals that may be in the frame 
 											or in registers. InFrame(X) indicates a memory location 
@@ -30,12 +41,9 @@ val formals : frame -> access list (* Extracts a list of k "accesses" denoting t
 									Parameters may be seen differently by the caller and the callee *)
 val allocArg : frame -> bool -> access
 val allocLocal : frame -> bool -> access
-val sp : tigertemp.temp
 val maxRegFrame : frame -> int
 val wSz : int
 val log2WSz : int
-val calldefs : tigertemp.temp list
-val callersaves : tigertemp.temp list
 val exp : access -> tigertree.exp -> tigertree.exp
 val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an external function which is 
 																	written in C or assembly lang - it cannot 
@@ -49,8 +57,14 @@ val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an
 																	passed. The implementation may have to be 
 																	adjusted for static links, or "_" in labels, 
 																	and so on. Page 156 *)
+val printAL : access list -> string
+
 val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
-(*val procEntryExit2 : frame * tigerassem.instr list -> tigerassem.instr list*)
+
+val procEntryExit2 : frame * tigerassem.instr list -> tigerassem.instr list
+
+(* Handle only procedure entry/exit sequences *)
+(* val procEntryExit3 : frame -> string -> string *)
 
 (*
 	FRAGMENTS
@@ -78,8 +92,5 @@ val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
 *)
 datatype frag = PROC of {body: tigertree.stm, frame: frame}
 	| STRING of tigertemp.label * string
-
-
-val printAL : access list -> string
 
 end

@@ -33,12 +33,14 @@ open tigertree
 type level = int			(* nivel de anidamiento *)
 datatype access = InFrame of int | InReg of tigertemp.label
 
-val fp = "FP"				(* frame pointer *)
-val sp = "SP"				(* stack pointer *)
-val rv = "RV"				(* return value  *)
-val ov = "OV"				(* overflow value (edx en el 386) *)
+val fp = "FP"				(* frame pointer register *)
+val sp = "SP"				(* stack pointer register *)
+val rv = "RV"				(* return value register *)
+val ov = "OV"				(* overflow value (edx en el 386). Sigue existiendo en X64?? *)
+val rax = "rax"
+val rdx = "rdx"
 
-val wSz = 4					(* word size in bytes *)
+val wSz = 4					(* word size in bytes (1 byte = 8 bits). Then, wSz = 32 bits *)
 val log2WSz = 2				(* base two logarithm of word size in bytes *)
 
 val fpPrev = 0				(* offset (bytes) from fp *)
@@ -54,11 +56,13 @@ val accessListInitial = [InFrame (fpPrevLev)] (* Only SL access *)
 val argsGap = wSz			(* bytes *)
 val localsGap = ~4 			(* bytes *)
 
-val calldefs = [rv]
-val specialregs = [rv, fp, sp]
-val argregs = []
-val callersaves = []
-val calleesaves = []
+val specialregs = [rv, fp, sp]									(* special purpose registers *)
+val argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]			(* used to pass first 6 parameters to called functions *)
+val callersaves = ["r10", "r11"] 								(* registers that must be preserved by the caller *)
+val calleesaves = ["rbx", "rbp", "r12", "r13", "r14", "r15"] 	(* registers that must be saved across function calls *)
+val calldefs = [rv] @ callersaves
+
+val registers = specialregs @ argregs @ callersaves @ callersaves	(* all machine registers *)
 
 type register = string
 
@@ -168,13 +172,30 @@ fun allocLocal (f: frame) b =
 	If a is a register access such as InReg(t), then the frame-
 	address argument to tigerframe.exp will be discarded, and 
 	the result will be simply TEMP t" - page 156 
+
+	exp : access -> tigertree.exp -> tigertree.exp
 *)
-(* exp : access -> tigertree.exp -> tigertree.exp *)
 fun exp(InFrame k) e = MEM(BINOP(PLUS, e, CONST k))
 	| exp(InReg l) _ = TEMP l
 
 fun externalCall(s, l) = CALL(NAME s, l)
 
 fun procEntryExit1 (frame, body) = body
+
+(* Tell that certain registers are live at procedure exit *)
+fun procEntryExit2 (frame, body) = 
+	[tigerassem.OPER{
+		assem="",
+		src=[],
+		dst=[sp, fp] @ calleesaves,
+		jump=SOME []
+	}]
+	@ body
+	@ [tigerassem.OPER{
+		assem="",
+		src=[sp, fp] @ calleesaves,
+		dst=[],
+		jump=SOME []
+	}]
 	
 end
