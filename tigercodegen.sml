@@ -4,7 +4,9 @@ struct
 	(* NOTE: x86_64 instruction selection; AT&T syntax (GAS syntax)
 	The main advantage of using this syntax is its compatibility with the GCC inline assembly syntax
 
-	The fundamental data types are (signed/unsigned integers): 
+	Remember: In the Tiger language, an int is a 64 bits long using sign convention
+
+	The fundamental data types are: 
 		- byte = 8 bits
 		- word = 2 bytes (16 bits)
 		- doubleword = 4 bytes (32 bits)
@@ -24,7 +26,7 @@ struct
 
 	(* codegen : tigerframe.frame -> tigertree.stm -> tigerassem.instr list *)
 	(* Assuming that 'stm' parameter is canonized *)
-	fun codegen (stm : tigertree.stm) : instr list =
+	fun codegen frame (stm : tigertree.stm) : instr list =
 		let
 			val ilist = ref ([] : instr list) 			(* list of assembly-lang instructions *)
 
@@ -164,10 +166,7 @@ struct
 							| GT => "jg"
 							| LE => "jle"
 							| GE => "jge"
-							| ULT => "jb"
-							| ULE => "jbe"
-							| UGT => "jae"
-							| UGE => "jge"
+							| _ => raise Fail "Error - munchStm(): operación de comparación no soportada"
 
 						val _ = emit(OPER{
 								assem="cmpq `s0 `s1\n",
@@ -543,6 +542,26 @@ struct
 									jump=NONE
 								});
 							munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))	(* Move result of division to result temp *)
+					end
+
+				(* MUL op cases *)
+
+				| munchExp(BINOP(MUL, e1, e2)) =
+					let
+						val tmpe2 = munchExp e2
+					in
+						generateTmp(fn r => 
+							(munchStm(MOVE(TEMP tigerframe.rax, e1));
+							emit(OPER{
+									assem="imulq `s2\n",
+									src=[tigerframe.rax,
+										tigerframe.rdx,
+										tmpe2],
+									dst=[tigerframe.rax,
+										tigerframe.rdx],
+									jump=NONE
+								});
+							munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))
 					end
 
 				| munchExp(BINOP(_,_,_)) = raise Fail "Error - munchExp(): operación binaria no soportada"
