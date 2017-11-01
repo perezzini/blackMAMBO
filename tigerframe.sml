@@ -30,49 +30,50 @@ structure tigerframe :> tigerframe = struct
 
 open tigertree
 
-type level = int			(* nivel de anidamiento *)
-datatype access = InFrame of int | InReg of tigertemp.label
+type level = int
 
-val fp = "FP"				(* frame pointer register *)
-val sp = "SP"				(* stack pointer register *)
-val rv = "RV"				(* return value register *)
-val ov = "OV"				(* overflow value (edx en el 386). Sigue existiendo en X64?? *)
+datatype access = InFrame of int 
+				| InReg of tigertemp.label
+
+val fp = "rbp"				(* frame pointer register *)
+val sp = "rsp"				(* stack pointer register *)
+val rv = "rax"				(* return value register; also used in idiv and imul instructions *)
 val rax = "rax"
-val rdx = "rdx"
+val rdx = "rdx"				(* third argument register; also used in idiv and imul instructions *)
 
-val wSz = 4					(* word size in bytes (1 byte = 8 bits). Then, wSz = 32 bits *)
-val log2WSz = 2				(* base two logarithm of word size in bytes *)
+val wSz = 8					(* word size in bytes *)
 
 val fpPrev = 0				(* offset (bytes) from fp *)
-val fpPrevLev = 8			(* offset (bytes) from fp *)
+val fpPrevLev = 16			(* offset (bytes) from fp *)
 
-val argsInicial = 0			(* words *) (* initial number of arguments *)
-val localsInicial = 0		(* words *) (* initial number of local variables *)
-val regInicial = 1			(* reg *)
+val argsInitial = 0			(* initial number of arguments *)
+val localsInitial = 0		(* initial number of local variables *)
 
 val argsOffInicial = 0		(* words *)
-val accessListInitial = [InFrame (fpPrevLev)] (* Only SL access *)
+val accessListInitial = [InFrame (fpPrevLev)] (* Just the static link access *)
 
-val argsGap = wSz			(* bytes *)
-val localsGap = ~4 			(* bytes *)
+val argsGap = wSz
+val localsGap = ~8 			(* bytes *)
 
 val specialregs = [rv, fp, sp]									(* special purpose registers *)
 val argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]			(* used to pass first 6 parameters to called functions *)
+val argregsNum = length argregs
 val callersaves = ["r10", "r11"] 								(* registers that must be preserved by the caller *)
 val calleesaves = ["rbx", "rbp", "r12", "r13", "r14", "r15"] 	(* registers that must be saved across function calls *)
-val calldefs = [rv] @ callersaves
+val calldefs = [rv] 
+				@ callersaves
 
-val registers = specialregs @ argregs @ callersaves @ callersaves	(* all machine registers *)
+val registers = specialregs 
+				@ argregs 
+				@ callersaves 
+				@ callersaves	(* all machine registers *)
 
 type register = string
 
 type frame = {
 	name: tigertemp.label,		(* Name of the function corresponding to the frame *)
 	formals: access list ref,	(* Access list of the function corresponding arguments *)
-	locals: bool list,			(* List of booleans corresponding to escaped, or not escaped, function's local variables *)
-	actualArg: int ref,			(* Total number of the function's arguments *)
-	actualLocal: int ref,		(* Total number of the function's local variables in memory *)
-	actualReg: int ref 			(* Maybe it is not used... *)
+	actualLocal: int ref		(* Total number of the function's local variables *)
 }
 
 datatype frag = PROC of {body: tigertree.stm, frame: frame}
@@ -81,12 +82,33 @@ datatype frag = PROC of {body: tigertree.stm, frame: frame}
 (* newFrame : {name: tigertemp.label, formals: bool list} -> frame *)
 fun newFrame{name, formals} = {
 	name=name,
-	formals=ref accessListInitial, (* Each frame contains a SL *)
-	locals=[],
-	actualArg=ref argsInicial,
-	actualLocal=ref localsInicial,
-	actualReg=ref regInicial
+	formals=ref accessListInitial,
+	actualLocal=ref localsInitial
 }
+
+(*
+fun newFrame{name, formals} =
+	let
+		val f : frame = {
+			name=name,
+			formals=ref accessListInitial,
+			actualLocal=ref localsInitial
+		}
+
+		fun allocArg _ [] = []
+			| allocArg n (e::es) = (if n < argregsNum 
+										then 
+											allocLocal f e 
+										else 
+											allocLocal f true) :: (allocArg (n+1) es)
+	in
+		{
+			name = #name f,
+			formals = (!(#formals f)) @ (allocArg 0 formals),
+			actualLocal = #actualLocal f
+		}
+	end
+*)
 
 (* name : frame -> tigertemp.label *)
 fun name(f: frame) = #name f
@@ -96,9 +118,6 @@ fun string(l, s) = l^tigertemp.makeString(s)^"\n"
 
 (* formals : frame -> access list *)
 fun formals({formals=f, ...}: frame) = !f
-
-(* maxRegFrame : frame -> int *)
-fun maxRegFrame(f: frame) = !(#actualReg f)
 
 (* 	Alloca un nuevo argumento. b indica si se retorna InReg (caso false) 
 	o InFrame (caso true) 
@@ -124,11 +143,11 @@ fun allocArg (f: frame) b =
 		val a = case b of
 			true =>
 				let	
-					val ret = InFrame(!(#actualLocal f)+localsGap) (* reserve space in memory *)
+					val ret = InFrame(!(#actualLocal f)+localsGap)
 				in	
 					#actualLocal f := (!(#actualLocal f)-1); ret 
 				end
-			| false => InReg(tigertemp.newtemp()) (* reserve temporary register *)
+			| false => InReg(tigertemp.newtemp())
 
 		val _ = #formals f := (!(#formals f)) @ [a]
 
@@ -147,15 +166,13 @@ fun allocArg (f: frame) b =
 *)
 fun allocLocal (f: frame) b = 
 	case b of
-		(* local var escapes *)
 		true =>
 			let	
-				val ret = InFrame(!(#actualLocal f)+localsGap) (* reserve space in memory *)
+				val ret = InFrame(!(#actualLocal f)+localsGap)	(* local var escapes *)
 			in	
 				#actualLocal f := (!(#actualLocal f)-1); ret 
 			end
-		(* local var does not escape *)
-		| false => InReg(tigertemp.newtemp()) (* reserve temporary register *)
+		| false => InReg(tigertemp.newtemp())					(* local var does not escape *)
 
 (* 	
 	(Used by tigertrans to turn a tigerframe.access into the 
@@ -180,7 +197,7 @@ fun exp(InFrame k) e = MEM(BINOP(PLUS, e, CONST k))
 
 fun externalCall(s, l) = CALL(NAME s, l)
 
-fun procEntryExit1 (frame, body) = body
+fun procEntryExit1 ({formals, ...} : frame, body) = body
 
 (* Tell that certain registers are live at procedure exit *)
 fun procEntryExit2 (frame, body) = 

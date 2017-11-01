@@ -10,11 +10,14 @@ type frame (* Holds info about formal parameters and local variables allocated i
 type register = string
 
 val rv : tigertemp.temp
-val ov : tigertemp.temp
 val fp : tigertemp.temp
 val sp : tigertemp.temp
 val rax : tigertemp.temp
 val rdx : tigertemp.temp
+
+val wSz : int
+val fpPrev : int
+val fpPrevLev : int
 
 val calldefs : tigertemp.temp list
 val callersaves : tigertemp.temp list
@@ -26,8 +29,7 @@ datatype access = InFrame of int
 											or in registers. InFrame(X) indicates a memory location 
 											at offset X from the frame pointer. InReg(t84) indicates 
 											that it will be held in "register" t84 *)
-val fpPrev : int
-val fpPrevLev : int
+
 val newFrame : {name: tigertemp.label, formals: bool list} -> frame (* Creates a new frame for a function f with k 
 																	formal parameters. Call newFrame{name=f, formals=l}, 
 																	where l is a list of k booleans: true for each 
@@ -41,9 +43,6 @@ val formals : frame -> access list (* Extracts a list of k "accesses" denoting t
 									Parameters may be seen differently by the caller and the callee *)
 val allocArg : frame -> bool -> access
 val allocLocal : frame -> bool -> access
-val maxRegFrame : frame -> int
-val wSz : int
-val log2WSz : int
 val exp : access -> tigertree.exp -> tigertree.exp
 val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an external function which is 
 																	written in C or assembly lang - it cannot 
