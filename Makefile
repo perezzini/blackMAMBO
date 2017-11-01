@@ -70,6 +70,7 @@ depend: tigerabs.sml tigergrm.sml tigerlex.sml tigermain.sml \
 
 ### DO NOT DELETE THIS LINE
 tigerassem.uo: tigertemp.ui 
+tigerflowgraph.ui: tigergraph.ui tigertemp.ui 
 tigerpila.uo: tigerpila.ui 
 tigertree.uo: tigertemp.ui 
 tigertemp.uo: tigertemp.ui 
@@ -80,9 +81,9 @@ tigerescap.ui: tigerabs.uo
 tigerinterp.uo: tigertree.uo tigertab.ui tigerframe.ui tigerit.uo \
     tigertemp.ui 
 tigertab.uo: tigertab.ui 
-tigermain.uo: tigerseman.ui tigerescap.ui tigergrm.ui tigerframe.ui \
-    tigerit.uo tigercanon.ui tigerinterp.uo tigerlex.uo tigertrans.ui \
-    tigerpp.uo 
+tigermain.uo: tigerseman.ui tigercodegen.ui tigerescap.ui tigergrm.ui \
+    tigerframe.ui tigerit.uo tigercanon.ui tigerassem.uo tigerinterp.uo \
+    tigertemp.ui tigerlex.uo tigertrans.ui tigerpp.uo 
 tigerseman.uo: tigerseman.ui tigersres.uo tigertab.ui tigerpila.ui \
     tigertopsort.ui tigertemp.ui tigerabs.uo tigermuestratipos.ui \
     tigertrans.ui 
@@ -95,16 +96,17 @@ tigertrans.uo: tigertrans.ui tigertree.uo tigerpila.ui tigerframe.ui \
 tigerescap.uo: tigerescap.ui tigertab.ui tigerabs.uo 
 tigermuestratipos.uo: tigermuestratipos.ui tigertips.uo 
 tigerframe.uo: tigerframe.ui tigertree.uo tigerassem.uo tigertemp.ui 
-tigergraph.uo: tigergraph.ui tigertemp.ui 
+tigergraph.uo: tigergraph.ui tigertab.ui tigertemp.ui 
 tigerit.uo: tigertree.uo tigertab.ui 
 tigergrm.ui: tigerabs.uo 
 tigercodegen.uo: tigercodegen.ui tigertree.uo tigerframe.ui tigerassem.uo \
     tigertemp.ui 
-tigercodegen.ui: tigertree.uo tigerassem.uo 
+tigercodegen.ui: tigertree.uo tigerframe.ui tigerassem.uo 
 tigersres.uo: tigertab.ui tigertips.uo tigertemp.ui tigerabs.uo \
     tigertrans.ui 
 tigerlex.uo: tigergrm.ui tigernlin.uo 
 tigertrans.ui: tigertree.uo tigerframe.ui tigertemp.ui tigerabs.uo 
+tigerflowgraph.uo: tigerflowgraph.ui tigertab.ui tigergraph.ui tigertemp.ui 
 tigerpp.uo: tigerabs.uo 
 tigercanon.ui: tigertree.uo tigertemp.ui 
 tigerframe.ui: tigertree.uo tigerassem.uo tigertemp.ui 
