@@ -237,7 +237,7 @@ struct
 						let
 							fun emitcdefs s =
 								emit(OPER{
-										assem="popq `s0 # RESTORE CALLER-SAVED REGISTER\n",
+										assem="popq `d0 # RESTORE CALLER-SAVED REGISTER\n",
 										src=[],
 										dst=[s],
 										jump=NONE
