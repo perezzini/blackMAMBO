@@ -3,16 +3,24 @@
 
 		|    argn    |	fp+8*(n+1)
 		|    ...     |
-		|    arg2    |	fp+32
-		|    arg1    |	fp+24
-		|	fp level |  fp+16
+		|    arg8    |	fp+32
+		|    arg7    |	fp+24
+		|	 arg6    |  fp+16
 		|  retorno   |	fp+8
 		|   fp ant   |	fp
 		--------------	fp
-		|   local1   |	fp-8
-		|   local2   |	fp-4
+		|   s-link   |	fp-8
+		|   local1   |	fp-4
 		|    ...     |
 		|   localn   |	fp-8*n
+
+
+		rdi -> static link
+		rsi -> arg1
+		rdx -> arg2
+		rcx -> agr3
+		r8  -> arg4
+		r9  -> arg5
 *)
 
 (* IMPORTANT:
@@ -46,7 +54,7 @@ val wSz = 8					(* word size in bytes *)
 val fpPrev = 0				(* offset (bytes) from fp *)
 val fpPrevLev = 16			(* offset (bytes) from fp *)
 
-val localsInitial = 0		(* initial number of local variables *)
+val localsInitial = 1		(* initial number of local variables *)
 val argsInitial = 1			(* initial number of arguments (considering static link as an argument) *)
 
 val argsOffInitial = 2		(* offset for the 1st argument in stack frame *)
@@ -59,7 +67,7 @@ val specialregs = [rv, fp, sp]									(* special purpose registers *)
 val argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]			(* used to pass first 6 parameters to called functions *)
 val argregsNum = length argregs
 val callersaves = ["r10", "r11"] 								(* registers that must be preserved by the caller *)
-val calleesaves = ["rbx", "rbp", "r12", "r13", "r14", "r15"] 	(* registers that must be saved across function calls *)
+val calleesaves = ["rbx", "r12", "r13", "r14", "r15"] 	(* registers that must be saved across function calls *)
 val calldefs = [rv] 
 				@ callersaves
 
@@ -112,10 +120,10 @@ fun printAL al =
 
 (* allocArg : frame -> bool -> access *)
 fun allocArg (f : frame) b =
-	if b orelse !(#argsCounter f) > argregsNum 
+	if b
 	then 
 		let
-		 	val ret = InFrame ((!(#argsCounter f)+argsOffInitial)*wSz)
+		 	val ret = InFrame(!(#actualLocal f)*8+localsGap)
 		 	val _ = #argsCounter f := !(#argsCounter f) + 1
 		 	val _ = #formals f := (!(#formals f)) @ [ret]
 		 in
@@ -140,7 +148,7 @@ fun allocLocal (f: frame) b =
 	case b of
 		true =>
 			let	
-				val ret = InFrame(!(#actualLocal f)+localsGap)	(* local var escapes *)
+				val ret = InFrame(!(#actualLocal f)*8+localsGap)	(* local var escapes *)
 			in	
 				#actualLocal f := (!(#actualLocal f)-1); ret 
 			end
@@ -192,6 +200,19 @@ fun procEntryExit1 ({formals, ...} : frame, body) =
 				| InFrame offset => MOVE(exp (InFrame offset) (TEMP fp), TEMP argreg)) regPairs
 
 		
+		val parametersMoves' = 
+			let
+				val formals' = List.drop(!formals, argregsNum + 1)
+				val tab = List.tabulate(List.length formals', fn x => x)
+				val accOff = ListPair.zip(formals', tab)
+			in
+				map (fn (access, offset) => 
+				case access of
+					InReg r => MOVE(TEMP r, exp (InFrame (offset*8 + 8)) (TEMP fp))
+					| InFrame offset' => MOVE(exp (InFrame offset') (TEMP fp), exp (InFrame (offset*8 + 8)) (TEMP fp))) accOff
+			end
+			handle Subscript => []
+
 		(* Store instructions for saving and restoring callee-saves *)
 		val (saveCalleesaves, restoreCalleesaves) = foldl
 	          (fn (t, (a, b)) => let val fresh = tigertemp.newtemp()
@@ -201,6 +222,7 @@ fun procEntryExit1 ({formals, ...} : frame, body) =
 
 	in
 		seq(parametersMoves
+			@ parametersMoves'
 			@ saveCalleesaves
 			@ [body]
 			@ restoreCalleesaves)
