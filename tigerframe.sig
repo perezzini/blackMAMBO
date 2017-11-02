@@ -60,7 +60,6 @@ val printAL : access list -> string
 
 val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
 
-val procEntryExit2 : frame * tigerassem.instr list -> tigerassem.instr list
 
 (* Handle only procedure entry/exit sequences *)
 (* val procEntryExit3 : frame -> string -> string *)
