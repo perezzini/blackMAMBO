@@ -35,8 +35,6 @@ val allocLocal : level -> bool -> access (* "allocLocal(lev)(esc): creates a loc
 
 type exp
 
-val seq : tigertree.stm list -> tigertree.stm
-
 val procEntryExit : {level: level, body: exp} -> unit
 val getResult : unit -> frag list
 val unitExp : unit -> exp
