@@ -526,7 +526,7 @@ struct
 						generateTmp(fn r => 
 							(munchStm(MOVE(TEMP tigerframe.rax, e1));
 							emit(OPER{
-									assem="cqo\n",					(* cqo: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
+									assem="cqto\n",					(* cqo: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
 																	broadcasts the sign bit of RAX into every bit of RDX *)
 									src=[tigerframe.rax],
 									dst=[tigerframe.rdx],
