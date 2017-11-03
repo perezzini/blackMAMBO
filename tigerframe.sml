@@ -1,5 +1,5 @@
 (*
-	Frames para el 80386 (sin displays ni registers).
+	x64 frame architecture:
 
 		|    argn    |	fp+8*(n+1)
 		|    ...     |
@@ -43,31 +43,42 @@ type level = int
 datatype access = InFrame of int 
 				| InReg of tigertemp.label
 
-val fp = "rbp"				(* frame pointer register *)
-val sp = "rsp"				(* stack pointer register *)
-val rv = "rax"				(* return value register; also used in idiv and imul instructions *)
-val rax = "rax"
-val rdx = "rdx"				(* third argument register; also used in idiv and imul instructions *)
+val rax = "%rax"	(* result register; also used in idiv and imul instructions *)
+val rbx = "%rbx"	(* miscellaneous register *)
+val rcx = "%rcx"	(* 4th argument register *)
+val rdx = "%rdx"	(* 3rd argument register; also used in idiv and imul instructions *)
+val rsp = "%rsp"	(* stack pointer register *)
+val rbp = "%rbp"	(* frame pointer register *)
+val rsi = "%rsi"	(* 2nd argument register *)
+val rdi = "%rdi"	(* 1st argument register *)
+val r8 = "%r8"		(* 5th argument register *)
+val r9 = "%r9"		(* 6th argument register *)
+val r10 = "%r10"	(* miscellaneous register *)
+val r11 = "%r11"	(* miscellaneous register *)
+val r12 = "%r12"	(* miscellaneous register *)
+val r13 = "%r13"	(* miscellaneous register *)
+val r14 = "%r14"	(* miscellaneous register *)
+val r15 = "%r15"	(* miscellaneous register *)
+
+val fp = rbp				(* frame pointer register *)
+val sp = rsp				(* stack pointer register *)
+val rv = rax				(* return value register; also used in idiv and imul instructions *)
 
 val wSz = 8					(* word size in bytes *)
 
 val fpPrev = 0				(* offset (bytes) from fp *)
 val fpPrevLev = 16			(* offset (bytes) from fp *)
 
-val localsInitial = 1		(* initial number of local variables *)
-val argsInitial = 1			(* initial number of arguments (considering static link as an argument) *)
+val localsInitial = 1		(* initial number of local variables (considering static link) *)
 
-val argsOffInitial = 2		(* offset for the 1st argument in stack frame *)
 val accessListInitial = [InFrame (fpPrevLev)] (* Static link access *)
 
-val argsGap = wSz
 val localsGap = ~wSz
 
-val specialregs = [rv, fp, sp]									(* special purpose registers *)
-val argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]			(* used to pass first 6 parameters to called functions *)
-val argregsNum = length argregs
-val callersaves = ["r10", "r11"] 								(* registers that must be preserved by the caller *)
-val calleesaves = ["rbx", "r12", "r13", "r14", "r15"] 	(* registers that must be saved across function calls *)
+val specialregs = [rv, fp, sp]					(* special purpose registers *)
+val argregs = [rdi, rsi, rdx, rcx, r8, r9]		(* used to pass first 6 parameters to called functions *)
+val callersaves = [r10, r11]					(* registers that must be preserved by the caller *)
+val calleesaves = [rbx, r12, r13, r14, r15]		(* registers that must be saved across function calls *)
 val calldefs = [rv] 
 				@ callersaves
 
@@ -75,14 +86,14 @@ val registers = specialregs
 				@ argregs 
 				@ callersaves 
 				@ callersaves	(* all machine registers *)
+val argregsNum = List.length argregs
 
 type register = string
 
 type frame = {
 	name: tigertemp.label,		(* Name of the function corresponding to the frame *)
 	formals: access list ref,	(* Access list of the function corresponding arguments *)
-	actualLocal: int ref,		(* Total number of the function's local variables *)
-	argsCounter: int ref		(* Counter of incoming parameters *)
+	actualLocal: int ref		(* Total number of the function's local variables *)
 }
 
 datatype frag = PROC of {body: tigertree.stm, frame: frame}
@@ -92,8 +103,7 @@ datatype frag = PROC of {body: tigertree.stm, frame: frame}
 fun newFrame{name, formals} = {
 	name=name,
 	formals=ref accessListInitial,
-	actualLocal=ref localsInitial,
-	argsCounter=ref argsInitial
+	actualLocal=ref localsInitial
 }
 
 (* name : frame -> tigertemp.label *)
@@ -123,8 +133,7 @@ fun allocArg (f : frame) b =
 	if b
 	then 
 		let
-		 	val ret = InFrame(!(#actualLocal f)*8+localsGap)
-		 	val _ = #argsCounter f := !(#argsCounter f) + 1
+		 	val ret = InFrame(!(#actualLocal f)*8 + localsGap)
 		 	val _ = #formals f := (!(#formals f)) @ [ret]
 		 in
 		 	ret
@@ -132,27 +141,21 @@ fun allocArg (f : frame) b =
 	else 
 		let
 			val ret = InReg (tigertemp.newtemp())
-			val _ = #argsCounter f := !(#argsCounter f) + 1
 			val _ = #formals f := (!(#formals f)) @ [ret]
 		in
 			ret
 		end
 
-
-(* 	Alloca una nueva variable local. b indica si se retorna InReg (caso false) o 
-	InFrame (caso true) 
-
-	allocLocal : frame -> bool -> access 
-*)
+(* allocLocal : frame -> bool -> access *)
 fun allocLocal (f: frame) b = 
 	case b of
 		true =>
 			let	
-				val ret = InFrame(!(#actualLocal f)*8+localsGap)	(* local var escapes *)
+				val ret = InFrame(!(#actualLocal f)*8 + localsGap)
 			in	
-				#actualLocal f := (!(#actualLocal f)-1); ret 
+				#actualLocal f := (!(#actualLocal f) - 1); ret 
 			end
-		| false => InReg(tigertemp.newtemp())					(* local var does not escape *)
+		| false => InReg(tigertemp.newtemp())
 
 (* 	
 	(Used by tigertrans to turn a tigerframe.access into the 
@@ -175,8 +178,10 @@ fun allocLocal (f: frame) b =
 fun exp(InFrame k) e = MEM(BINOP(PLUS, e, CONST k))
 	| exp(InReg l) _ = TEMP l
 
+(* externalCall : string * tigertree.exp list -> tigertree.exp *)
 fun externalCall(s, l) = CALL(NAME s, l)
 
+(* seq : tigertree.stm list -> tigertree.stm *)
 fun seq [] = EXP (CONST 0)
 	| seq [s] = s
 	| seq (x::xs) = SEQ (x, seq xs)
@@ -205,11 +210,13 @@ fun procEntryExit1 ({formals, ...} : frame, body) =
 				val formals' = List.drop(!formals, argregsNum + 1)
 				val tab = List.tabulate(List.length formals', fn x => x)
 				val accOff = ListPair.zip(formals', tab)
+				val accOff' = map (fn (access, offset) => 
+					(access, offset*8 + 8)) accOff
 			in
 				map (fn (access, offset) => 
 				case access of
-					InReg r => MOVE(TEMP r, exp (InFrame (offset*8 + 8)) (TEMP fp))
-					| InFrame offset' => MOVE(exp (InFrame offset') (TEMP fp), exp (InFrame (offset*8 + 8)) (TEMP fp))) accOff
+					InReg r => MOVE(TEMP r, exp (InFrame offset) (TEMP fp))
+					| InFrame offset' => MOVE(exp (InFrame offset') (TEMP fp), exp (InFrame offset) (TEMP fp))) accOff
 			end
 			handle Subscript => []
 
