@@ -58,11 +58,13 @@ val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an
 																	and so on. Page 156 *)
 val printAL : access list -> string
 
+(* Applied in tigertrans.functionDec() *)
 val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
 
+(* val procEntryExit2 : assem.instr list -> assem.instr list *)
 
-(* Handle only procedure entry/exit sequences *)
-(* val procEntryExit3 : frame -> string -> string *)
+(* Handles only procedure entry/exit sequences *)
+val procEntryExit3 : frame -> string -> string
 
 (*
 	FRAGMENTS

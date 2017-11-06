@@ -10,7 +10,7 @@
 		|   fp ant   |	fp
 		--------------	fp
 		|   s-link   |	fp-8
-		|   local1   |	fp-4
+		|   local1   |	fp-16
 		|    ...     |
 		|   localn   |	fp-8*n
 
@@ -51,8 +51,8 @@ val rsp = "%rsp"	(* stack pointer register *)
 val rbp = "%rbp"	(* frame pointer register *)
 val rsi = "%rsi"	(* 2nd argument register *)
 val rdi = "%rdi"	(* 1st argument register *)
-val r8 = "%r8"		(* 5th argument register *)
-val r9 = "%r9"		(* 6th argument register *)
+val r8 	= "%r8"		(* 5th argument register *)
+val r9 	= "%r9"		(* 6th argument register *)
 val r10 = "%r10"	(* miscellaneous register *)
 val r11 = "%r11"	(* miscellaneous register *)
 val r12 = "%r12"	(* miscellaneous register *)
@@ -67,13 +67,13 @@ val rv = rax				(* return value register; also used in idiv and imul instruction
 val wSz = 8					(* word size in bytes *)
 
 val fpPrev = 0				(* offset (bytes) from fp *)
-val fpPrevLev = 16			(* offset (bytes) from fp *)
+val fpPrevLev = ~wSz		(* offset (bytes) from fp *)
 
 val localsInitial = 1		(* initial number of local variables (considering static link) *)
 
 val accessListInitial = [InFrame (fpPrevLev)] (* Static link access *)
 
-val localsGap = ~wSz
+val localsGap = wSz
 
 val specialregs = [rv, fp, sp]					(* special purpose registers *)
 val argregs = [rdi, rsi, rdx, rcx, r8, r9]		(* used to pass first 6 parameters to called functions *)
@@ -86,6 +86,7 @@ val registers = specialregs
 				@ argregs 
 				@ callersaves 
 				@ callersaves	(* all machine registers *)
+
 val argregsNum = List.length argregs
 
 type register = string
@@ -129,37 +130,35 @@ fun printAL al =
 	end
 
 (* allocArg : frame -> bool -> access *)
-fun allocArg (f : frame) b =
-	if b
-	then 
-		let
-		 	val ret = InFrame(!(#actualLocal f)*8 + localsGap)
-		 	val _ = #formals f := (!(#formals f)) @ [ret]
-		 in
-		 	ret
-		 end 
-	else 
-		let
-			val ret = InReg (tigertemp.newtemp())
-			val _ = #formals f := (!(#formals f)) @ [ret]
-		in
-			ret
-		end
+fun allocArg (f: frame) b =
+	case b of
+		true => let
+				 	val ret = InFrame (~(!(#actualLocal f)*wSz + localsGap))
+				 	val _ = #actualLocal f := (!(#actualLocal f) + 1)
+				 	val _ = #formals f := (!(#formals f)) @ [ret]
+				 in
+				 	ret
+				 end 
+		| false => let
+						val ret = InReg (tigertemp.newtemp())
+						val _ = #formals f := (!(#formals f)) @ [ret]
+					in
+						ret
+					end
 
 (* allocLocal : frame -> bool -> access *)
 fun allocLocal (f: frame) b = 
 	case b of
 		true =>
 			let	
-				val ret = InFrame(!(#actualLocal f)*8 + localsGap)
+				val ret = InFrame (~(!(#actualLocal f)*wSz + localsGap))
 			in	
-				#actualLocal f := (!(#actualLocal f) - 1); ret 
+				#actualLocal f := (!(#actualLocal f) + 1); ret 
 			end
-		| false => InReg(tigertemp.newtemp())
+		| false => InReg (tigertemp.newtemp())
 
 (* 	
-	(Used by tigertrans to turn a tigerframe.access into the 
-	Tree expression)
+	Turns a tigerframe.access into Tree expression.
 	For an access a such as InFrame(k), we have: 
 	exp(a) (TEMP(fp)) = MEM(BINOP(PLUS, TEMP(fp), CONST(k)))
 	"Why bother to pass the tree exp TEMP(fp) as an argument? 
@@ -187,8 +186,15 @@ fun seq [] = EXP (CONST 0)
 	| seq (x::xs) = SEQ (x, seq xs)
 
 (* procEntryExit1 : frame * tigertree.stm -> tigertree.stm *)
-fun procEntryExit1 ({formals, ...} : frame, body) = 
+fun procEntryExit1 (f as {formals, ...} : frame, body) = 
 	let
+		(* body : tigertree.stm
+		If function returns a value, "body" is a statement that moves the 
+		indicated value to RV register *)
+
+		(* DEBUGGING *)
+		(*val _  = print("\n**DEBUGGING from tigerframe.procEntryExit1():\nformals list of "^name f^" = "^printAL (!formals)^"\n")*)
+
 		val fmlsLength = List.length (!formals)
 		val fmlsRegisters = if fmlsLength > argregsNum 
 								then 
@@ -202,26 +208,26 @@ fun procEntryExit1 ({formals, ...} : frame, body) =
 		val parametersMoves = map (fn (access, argreg) => 
 			case access of
 				InReg r => MOVE(TEMP r, TEMP argreg)
-				| InFrame offset => MOVE(exp (InFrame offset) (TEMP fp), TEMP argreg)) regPairs
-
-		
+				| InFrame offset => MOVE(exp (InFrame offset) (TEMP fp), TEMP argreg)) regPairs	
 		val parametersMoves' = 
 			let
-				val formals' = List.drop(!formals, argregsNum + 1)
-				val tab = List.tabulate(List.length formals', fn x => x)
-				val accOff = ListPair.zip(formals', tab)
-				val accOff' = map (fn (access, offset) => 
-					(access, offset*8 + 8)) accOff
+				fun calculateNewOffset offset = offset*wSz + 2*wSz
+
+				val formals' = List.drop(!formals, argregsNum)
+				val tabs = List.tabulate(List.length formals', fn x => x)
+				val accOff = ListPair.zip(formals', tabs)
+				val accOff' = List.map (fn (access, offset) => 
+					(access, calculateNewOffset offset)) accOff
 			in
 				map (fn (access, offset) => 
 				case access of
 					InReg r => MOVE(TEMP r, exp (InFrame offset) (TEMP fp))
-					| InFrame offset' => MOVE(exp (InFrame offset') (TEMP fp), exp (InFrame offset) (TEMP fp))) accOff
+					| InFrame offset' => MOVE(exp (InFrame offset') (TEMP fp), exp (InFrame offset) (TEMP fp))) accOff'
 			end
 			handle Subscript => []
 
 		(* Store instructions for saving and restoring callee-saves *)
-		val (saveCalleesaves, restoreCalleesaves) = foldl
+		val (saveCalleesavesMoves, restoreCalleesavesMoves) = foldl
 	          (fn (t, (a, b)) => let val fresh = tigertemp.newtemp()
 	                              in (MOVE (TEMP fresh, TEMP t) :: a,
 	                                  MOVE (TEMP t, TEMP fresh) :: b) end)
@@ -230,9 +236,9 @@ fun procEntryExit1 ({formals, ...} : frame, body) =
 	in
 		seq(parametersMoves
 			@ parametersMoves'
-			@ saveCalleesaves
+			@ saveCalleesavesMoves
 			@ [body]
-			@ restoreCalleesaves)
+			@ restoreCalleesavesMoves)
 	end
 
 (* Tell that certain registers are live at procedure exit
@@ -252,4 +258,20 @@ fun procEntryExit2 (frame, body) =
 	}]
 	
 *)
+
+(* val procEntryExit3 : frame -> string -> string *)
+(* SCAFFOLD version... *)
+fun procEntryExit3 (f as {name, ...} : frame) body =
+	let
+		val prolog = "PROCEDURE "^name^"\n"
+		val body = body^"\n"
+		val epilog = "END "^name^"\n"
+	in
+		concat [
+			prolog,
+			body,
+			epilog
+		]
+	end
+
 end
