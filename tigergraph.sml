@@ -1,6 +1,6 @@
 structure tigergraph :> tigergraph =
 struct
-  open Dynarray                                                                   (* Array implementation *)
+  open Dynarray                                                                   (* Dynamic array implementation *)
 
   type node' = int
   type temp = tigertemp.temp
@@ -18,7 +18,9 @@ struct
 
   type node = graph * node'                                                       (* Contains a noderep allong with its assigned number within a graph *)
 
-  type 'a tableNodes = (node, 'a) tigertab.Tabla
+  type 'a Table = (node, 'a) tigertab.Tabla                                       (* When using a graph in an algorithm, we want each node to represent someting 
+                                                                                  (an instruction in a program, for example). Then, we want to make mappings from 
+                                                                                  nodes to the things they are supposed to represent *)
 
   fun eq((_,a),(_,b)) = a=b                                                       (* Two nodes are equal if their assigned number are equal *)
 
@@ -79,5 +81,6 @@ struct
 
   fun nodename(g,i:int) = "n" ^ Int.toString(i)
 
+  fun newNodeTable() = tigertab.tabNueva'(eq)
 end
 
