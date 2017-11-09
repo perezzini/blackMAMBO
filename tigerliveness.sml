@@ -1,7 +1,7 @@
 structure tigerliveness :> tigerliveness =
 struct
 
-	open Splayset tigerassem
+	open tigerassem
 
 	type node = tigerassem.instr * int
 
@@ -18,8 +18,10 @@ struct
 	(* calculateLiveOut : tigerassem.instr list -> tigertemp.temp list list *)
 	fun calculateLiveOut instrList =
 		let
+			val tabs = List.tabulate(List.length instrList, fn x => x)
+
 			(* instrListTabs : node list *)
-			val instrListTabs = List.tabulate(instrList, fn x => x)				(* Instructions numbered from 0 *)
+			val instrListTabs : node list = ListPair.zip(instrList, tabs)		(* Instructions numbered from 0 *)
 
 			fun compareNodes ((_, n1), (_, n2)) =
 				Int.compare(n1, n2)
@@ -31,6 +33,10 @@ struct
 																				node, where the integer 
 																				corresponds to the number of the node in the 
 																				graph. Every elem is a "node" for now on. *) 
+
+			val emptyStringSet = Splayset.empty(String.compare)
+			val (liveInArray, liveOutArray) = (Array.array (List.length instrList, emptyStringSet),
+												Array.array (List.length instrList, emptyStringSet))	(* Init live-in and live-out arrays with empty temp-sets *)
 
 			(* getLabelNodeNum : tigertemp.label -> int *)
 			fun getLabelNodeNum labelTemp = 
@@ -82,7 +88,8 @@ struct
 					val emptySet = Splayset.empty(String.compare)
 				in
 					case node of
-						(OPER {src, ...}, _) => Splayset.addList(src, emptySet)
+						(OPER {src, ...}, _) => Splayset.addList(emptySet, src)
+						| (MOVE {src ,...}, _) => Splayset.add(emptySet, src)
 						| _ => emptySet
 				end
 
@@ -92,38 +99,55 @@ struct
 					val emptySet = Splayset.empty(String.compare)
 				in
 					case node of
-						(OPER {dst, ...}, _) => Splayset.addList(dst, emptySet)
+						(OPER {dst, ...}, _) => Splayset.addList(emptySet, dst)
+						| (MOVE {dst ,...}, _) => Splayset.add(emptySet, dst)
 						| _ => emptySet
 				end
 
-			(* calculateInSet : node -> tigertemp.temp Splayset.set *)
-			fun calculateInSet node =
-				let
-					val useSet = calculateUseSet node
-					val defSet = calculateDefSet node
-					val outSet = calculateOutSet node
+			(* computationByIteration : node list -> bool -> unit *)
+			fun computationByIteration (((node as (_, n)) :: nodes) : node list) flag =
+					let
+						fun f (_, n) = Array.sub (liveInArray, n)
 
-					val diffSet = Splayset.difference(outSet, defSet)
-				in
-					Splayset.union(useSet, diffSet)
-				end
+						val (liveInArrayAux, liveOutArrayAux) = (Array.sub (liveInArray, n),
+																Array.sub (liveOutArray, n))
 
-			(* calculateOutSet : node -> tigertemp.temp Splayset.set *)
-			fun calculateOutSet node =
-				let
-					(* succNodes : node Splayset.set *)
-					val succNodes = fromNumToNode (successors node)
-					(* appIn : tigertemp.temp Splayset.set Splayset.set *)
-					val appIn = setMap calculateInSet succNodes String.compare
+						(* succNodes : node Splayset.set. Set of successors nodes of input node *)
+						val succNodes = fromNumToNode (successors node)
 
-					val emptySet = Splayset.empty(String.compare)
-				in
-					(* Returns generalized union. Has type: tigertemp.temp Splayset.set *)
-					Splayset.foldl union emptySet appIn
-				end
+						(* succNodes' : tigertemp.temp Splayset.set list *)
+						val succNodes' = setMap f succNodes String.compare 
+
+
+						val succNodesToList = Splayset.listItems(succNodes)
+						val mappedSuccNodesToList = List.map f succNodesToList
+
+
+						val _ = Array.update (liveOutArray, n, foldl Splayset.union emptyStringSet succNodes')
+
+						(* val _ = Array.update (liveOutArray, n, foldl Splayset.union emptyStringSet succNodes') *)
+
+						val diff = Splayset.difference(Array.sub (liveOutArray, n), calculateDefSet node)
+						val union = Splayset.union(calculateUseSet node, diff)
+
+						val _ = Array.update(liveInArray, n, union)
+
+						val flag' = (Splayset.equal (Array.sub (liveInArray, n), liveInArrayAux))
+									andalso
+									(Splayset.equal (Array.sub (liveOutArray, n), liveOutArrayAux))
+									andalso
+									flag
+					in
+						computationByIteration nodes flag'
+					end
+				| computationByIteration [] false = computationByIteration instrListTabs true
+				| computationByIteration [] true = ()
+
+			(* Compute liveness *)
+			val _ = computationByIteration instrListTabs true
 
 		in
-			(* Return type: tigertemp.temp Splayset.set Splayset.set *)
-			setMap calculateOutSet instrGraph String.compare
+			List.map (fn (_, n) => 
+				Array.sub(liveOutArray, n)) instrListTabs
 		end
 end
