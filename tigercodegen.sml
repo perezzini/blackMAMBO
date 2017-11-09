@@ -98,7 +98,7 @@ struct
 
 				| munchStm(MOVE(TEMP t, MEM e)) =
 					emit(OPER{
-							assem="movq (`s0), 'd0\n",
+							assem="movq (`s0), `d0\n",
 							src=[munchExp e],
 							dst=[t],
 							jump=NONE
@@ -127,6 +127,18 @@ struct
 							dst=[t1],
 							jump=NONE
 						})
+
+				| munchStm(MOVE(TEMP t, CALL(NAME f, args))) =
+					let
+						val _ = munchStm(EXP(CALL(NAME f, args)))	(* "Execute" call *)
+					in
+						emit(OPER{
+								assem="movq `s0, `d0\n",
+								src=[tigerframe.rv],
+								dst=[t],
+								jump=NONE
+							})
+					end
 
 				| munchStm(MOVE(TEMP t, e)) =
 					emit(tigerassem.MOVE{
@@ -206,7 +218,7 @@ struct
 						if diff > 0 
 						then 
 							emit(OPER{
-									assem="addq $"^intToString(diff*(tigerframe.wSz))^", %rsp",
+									assem="addq $"^intToString(diff*(tigerframe.wSz))^", %rsp\n",
 									src=[],
 									dst=[],
 									jump=NONE
@@ -224,7 +236,7 @@ struct
 						let
 							fun emitcdefs s =
 								emit(OPER{
-										assem="pushq `s0 # SAVE CALLER-SAVED REGISTER\n",
+										assem="pushq `s0 # SAVE CALLER-SAVE REGISTER\n",
 										src=[s],
 										dst=[],
 										jump=NONE
@@ -237,7 +249,7 @@ struct
 						let
 							fun emitcdefs s =
 								emit(OPER{
-										assem="popq `d0 # RESTORE CALLER-SAVED REGISTER\n",
+										assem="popq `d0 # RESTORE CALLER-SAVE REGISTER\n",
 										src=[],
 										dst=[s],
 										jump=NONE
