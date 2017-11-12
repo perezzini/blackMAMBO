@@ -22,16 +22,17 @@ fun main(args) =
 		val (flow, l6)		= arg(l5, "-flow") 
 		val (inter, l7)		= arg(l6, "-inter")
 		val (debug, l8)		= arg(l7, "-debug")
+		val (liveout, l9)	= arg(l8, "-liveout")
 
 		val entrada =
-			case l7 of
+			case l9 of 	(* Remember to change this value in case of new options *)
 			[n] => ((open_in n)
-					handle _ => raise Fail (n^" no existe!"))
+					handle _ => raise Fail (n^" no existe"))
 			| [] => std_in
-			| _ => raise Fail "opcio'n dsconocida!"
+			| _ => raise Fail "opción desconocida"
 		val lexbuf = lexstream entrada
-		val expr = prog Tok lexbuf handle _ => errParsing lexbuf (* AST, con escapes *)
-		val _ = findEscape(expr) (* AST, sin escapes *)
+		val expr = prog Tok lexbuf handle _ => errParsing lexbuf (* AST, with escapes *)
+		val _ = findEscape(expr) (* AST, without escapes *)
 
 		(* -arbol OPTION *)
 		val _ = if arbol 
@@ -68,7 +69,7 @@ fun main(args) =
 		val (procs, strings) = fragPartition fragments ([], [])
 
 		(* procsCanonized : (tigertree.stm list * tigertemp.label) list *)
-		val procsCanonized = map (fn {body, frame} => 
+		val procsCanonized = List.map (fn {body, frame} => 
 			(canonize body, frame)) procs
 
 		(* -canon OPTION *)
@@ -83,14 +84,14 @@ fun main(args) =
         (* -inter OPTION *)
         val _ = if inter 
         		then 
-        			tigerinterp.inter false procsCanonized strings 
+        			tigerinterp.inter debug procsCanonized strings 
         		else 
         			()
 
         (* procsToAssem : (tigertree.stm list * tigertemp.label) list -> (tigerassem.instr list * tigertemp.label) list *)
-       	val procsToAssem = map (fn (cbody, frame) => 
+       	val procsToAssem = List.map (fn (cbody, frame) => 
        		let
-       			val instrList = List.concat (map (tigercodegen.codegen frame) cbody)	(* cbody is a tigertree.stm list;
+       			val instrList = List.concat (List.map (tigercodegen.codegen frame) cbody)	(* cbody is a tigertree.stm list;
        																					tigercodegen.codegen returns a instr list. Then, we have to flat a list of lists *)
        		in
        			(instrList, frame)
@@ -98,9 +99,9 @@ fun main(args) =
 
        	(* Now, let's format each body converted to assembly language *)
        	(* assemBodyFormatted : (tigerassem.instr list * tigertemp.label) list -> (tigertemp.label * string list) list *)
-       	val assemBodyFormatted = map (fn (ilist, frame) => 
+       	val assemBodyFormatted = List.map (fn (ilist, frame) => 
        		(tigerframe.name frame, 
-       			map (tigerassem.format tigertemp.makeString) ilist)) procsToAssem	(* Since I have not done register assignment yet, I just pass 
+       			List.map (tigerassem.format tigertemp.makeString) ilist)) procsToAssem	(* Since I have not done register assignment yet, I just pass 
        																				tigertemp.makeString to format as the translation function from 
        																				temporaries to strings *)
 
@@ -110,6 +111,30 @@ fun main(args) =
        				List.app (fn (fName, instrStrList) => 
        					(print("\n"^fName^":\n");
        						List.app print instrStrList)) assemBodyFormatted
+       			else 
+       				()
+
+       	(* Liveness analysis info *)
+
+       	(* liveOutInfo : ((string * string) list * string) list *)
+       	val liveOutInfo : ((string * string) list * string) list = List.map (fn (instrList, frame) => 
+       		(tigerliveness.liveOutInfoToString instrList, tigerframe.name frame)) procsToAssem
+
+       	val liveOutInfo' : (string list * string) list = List.map (fn (assemLiveOutList, frameName) => 
+       		(List.map (fn (assemStr, tmpSetStr) => 
+       			let
+       				val concatValues = assemStr^"\t"^"live-out registers = "^tmpSetStr^"\n"
+       			in
+       				concatValues
+       			end) assemLiveOutList, frameName)) liveOutInfo
+
+
+       	(* -liveout OPTION *)
+       	val _ = if liveout 
+       			then 
+       				List.app (fn (assemLiveOutList, frameName) => 
+			       		(print("\n"^frameName^":\n");
+			       		List.app print assemLiveOutList)) liveOutInfo' 
        			else 
        				()
 	in
