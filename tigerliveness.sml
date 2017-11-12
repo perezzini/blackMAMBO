@@ -161,7 +161,12 @@ struct
 			set of live-out temporaries *)
 			val nodesList' = List.map (fn (instr, tmpSetStr) => 
 				(tigerassem.format tigertemp.makeString instr, tmpSetStr)) nodesList
+
+			(* Just eliminates the last char (\n) from an assembly instruction, for 
+			printing purpose *)
+			val nodesList'' = List.map (fn (instrStr, tmpSetStr) => 
+				(String.substring(instrStr, 0, (String.size instrStr) - 1), tmpSetStr)) nodesList'
 		in
-			nodesList'
+			nodesList''
 		end
 end
