@@ -56,7 +56,7 @@ val externalCall : string * tigertree.exp list -> tigertree.exp (* Referes to an
 																	passed. The implementation may have to be 
 																	adjusted for static links, or "_" in labels, 
 																	and so on. Page 156 *)
-val printAL : access list -> string
+val accessToString : access -> string
 
 (* Applied in tigertrans.functionDec() *)
 val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
