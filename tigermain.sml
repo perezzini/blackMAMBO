@@ -92,9 +92,11 @@ fun main(args) =
        	val procsToAssem = List.map (fn (cbody, frame) => 
        		let
        			val instrList = List.concat (List.map (tigercodegen.codegen frame) cbody)	(* cbody is a tigertree.stm list;
-       																					tigercodegen.codegen returns a instr list. Then, we have to flat a list of lists *)
+       																						tigercodegen.codegen returns a instr list. Then, we have to flat a list of lists *)
+       			
+       			val instrList' = tigerframe.procEntryExit2(frame, instrList)				(* Apply tigerframe.procEntryExit2() *)
        		in
-       			(instrList, frame)
+       			(instrList', frame)
        		end) procsCanonized
 
        	(* Now, let's format each body converted to assembly language *)
