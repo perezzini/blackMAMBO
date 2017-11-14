@@ -61,7 +61,7 @@ val accessToString : access -> string
 (* Applied in tigertrans.functionDec() *)
 val procEntryExit1 : frame * tigertree.stm -> tigertree.stm
 
-(* val procEntryExit2 : assem.instr list -> assem.instr list *)
+val procEntryExit2 : frame * tigerassem.instr list -> tigerassem.instr list 
 
 (* Handles only procedure entry/exit sequences *)
 val procEntryExit3 : frame -> string -> string

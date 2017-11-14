@@ -233,23 +233,23 @@ struct
 				@ restoreCalleesavesMoves)
 		end
 
-	(* Tell that certain registers are live at procedure exit
+	(* Tell that certain registers are live at procedure exit *)
 	fun procEntryExit2 (frame, body) = 
-		[tigerassem.OPER{
-			assem="",
-			src=[],
-			dst=[sp, fp] @ calleesaves,
-			jump=SOME []
-		}]
-		@ body
-		@ [tigerassem.OPER{
-			assem="",
-			src=[sp, fp] @ calleesaves,
-			dst=[],
-			jump=SOME []
-		}]
-		
-	*)
+		let
+			val exitLab = "EXIT_LAB"
+		in
+			body
+			@ [tigerassem.OPER{
+				assem="\n",
+				src=[rv] @ calleesaves,
+				dst=[],
+				jump=NONE
+			}]
+			@ [tigerassem.LABEL{
+				assem=exitLab^":\n",
+				lab=exitLab
+			}]
+		end
 
 	(* val procEntryExit3 : frame -> string -> string *)
 	(* SCAFFOLD version... *)
