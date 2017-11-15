@@ -5,6 +5,89 @@ struct
 
 	type node = tigerassem.instr * int
 
+	(* compareNodes : node * node -> order *)
+	fun compareNodes ((_, n1), (_, n2)) = Int.compare(n1, n2)
+
+	(* getLabelNodeNum : tigertemp.label -> node Splayset.set -> int
+	Where's the error? Couldn't find it...
+	fun getLabelNodeNum (labelTemp : string) (iGraph : node Splayset.set) = 
+		let
+			val num = case Splayset.find (fn (instr, _) => 
+						case instr of
+							LABEL {lab = labelTemp, ...} => true
+							| _ => false) iGraph of
+						SOME (_, n) => n
+						| NONE => raise Fail "Error - liveness: LABEL no encontrado en el grafo de instrucciones"
+		in
+			num
+		end
+	*)
+
+	(* createLabelsTableFromGraph : node Splayset.set -> (string * int) Splaymap.dict *)
+	fun createLabelsTableFromGraph iGraph =
+		let
+			val nodesList = Splayset.listItems iGraph
+
+			val labelNodes = List.filter (fn (instr, _) => 
+				case instr of
+					LABEL _ => true
+					| _ => false) nodesList
+
+			val labelNodes' : (string * int) list = List.map (fn (instr, n) => 
+				case instr of
+					LABEL {lab, ...} => (lab, n)
+					| _ => raise Fail "Error - liveness (createLabelsTableFromGraph()): no debería pasar") labelNodes
+
+			val table = Splaymap.mkDict String.compare
+		in
+			List.foldl (fn ((lab, n), table) => 
+				Splaymap.insert(table, lab, n)) table labelNodes'		(* Supposing "lab's" are unique *)
+		end
+
+	(* getLabelNodeNum : tigertemp.label -> (string * int) Splaymap.dict -> int *)
+	fun getLabelNodeNum (labelTemp : string) labelsTable = 
+		let
+			val num = case Splaymap.peek(labelsTable, labelTemp) of
+				SOME n => n
+				| NONE => raise Fail "Error - liveness: LABEL no encontrado en el grafo de instrucciones"
+		in
+			num
+		end
+
+	(* successors : node -> node Splayset.set -> int Splayset.set *)
+	fun successors node iGraph =
+		let
+			val resultSet = Splayset.empty(Int.compare)
+			val labelsTable = createLabelsTableFromGraph iGraph 		(* Hash table only containing labels "instructions" as keys, 
+																		mapping number of node *)
+		in
+			case node of
+				(OPER {jump = NONE, ...}, n) => Splayset.add(resultSet, n+1)
+				| (OPER {jump = SOME [], ...}, _) => raise Fail "Error - liveness: jump vacío"
+				| (OPER {jump = SOME [l], ...}, _) => Splayset.add(resultSet, getLabelNodeNum l labelsTable)
+				| (OPER {jump = SOME [t, f], ...}, _) => let
+															val resultSet' = Splayset.add(resultSet, getLabelNodeNum t labelsTable)
+															val resultSet'' = Splayset.add(resultSet', getLabelNodeNum f labelsTable)
+														in
+															Splayset.union(resultSet', resultSet'')
+														end
+				| (OPER {jump = SOME _, ...}, _) => raise Fail "Error - liveness: LABEL con más de dos etiquetas"
+				| (MOVE _, n) => Splayset.add(resultSet, n+1)
+				| (LABEL {lab = "EXIT_LAB", ...}, _) => resultSet
+				| (LABEL _, n) => Splayset.add(resultSet, n+1) (* LABEL cases ok? *)
+		end
+
+	(* fromNumToNode : int Splayset.set -> node Splayset.set -> node Splayset.set *)
+	fun fromNumToNode intSet iGraph = 
+		let
+			fun toNode num = case Splayset.find (fn (_, n) => 
+				if n=num then true else false) iGraph of
+				SOME node => node
+				| NONE => raise Fail "Error - liveness: número de nodo no encontrado en el grafo de instrucciones"
+		in
+			utils.setMap toNode intSet compareNodes
+		end
+
 	(* calculateLiveOut : tigerassem.instr list -> tigertemp.temp Splayset.set list *)
 	fun calculateLiveOut instrList =
 		let
@@ -13,65 +96,19 @@ struct
 			(* nodesList : node list *)
 			val nodesList : node list = ListPair.zip(instrList, tabs)			(* Instructions numbered from 0 *)
 
-			fun compareNodes ((_, n1), (_, n2)) =
-				Int.compare(n1, n2)
-
 			val emptyGraph = Splayset.empty(compareNodes)
 
-			(* instrGraph : node Splayset.set *)
-			val instrGraph = Splayset.addList(emptyGraph, nodesList)			(* Instructions graph. Every elem has type 
+			(* iGraph : node Splayset.set *)
+			val iGraph = Splayset.addList(emptyGraph, nodesList)				(* Instructions graph. Every elem has type 
 																				node, where the integer 
 																				corresponds to the number of the node in the 
-																				graph. Every elem is a "node" for now on. *) 
+																				graph. Every elem is a "node" for now on. *)
 
 			val emptyStringSet = Splayset.empty(String.compare)
 			val (liveInArray, liveOutArray) = (Array.array (List.length instrList, emptyStringSet),
 												Array.array (List.length instrList, emptyStringSet))	(* Init live-in and live-out arrays with empty temp-sets *)
 
-			(* getLabelNodeNum : tigertemp.label -> int *)
-			fun getLabelNodeNum labelTemp = 
-				let
-					val num = case Splayset.find (fn (instr, _) => 
-								case instr of
-									LABEL {lab=labelTemp, ...} => true
-									| _ => false) instrGraph of
-								SOME (_, n) => n
-								| NONE => raise Fail "Error - liveness: LABEL no encontrado en el grafo de instrucciones"
-				in
-					num
-				end
-
-			(* successors : node -> int Splayset.set *)
-			fun successors node =
-				let
-					val resultSet = Splayset.empty(Int.compare)
-				in
-					case node of
-						(OPER {jump = NONE, ...}, n) => Splayset.add(resultSet, n+1)
-						| (OPER {jump = SOME [l], ...}, _) => Splayset.add(resultSet, getLabelNodeNum l)
-						| (OPER {jump = SOME [t, f], ...}, _) => let
-																	val resultSet' = Splayset.add(resultSet, getLabelNodeNum t)
-																	val resultSet'' = Splayset.add(resultSet', getLabelNodeNum f)
-																in
-																	Splayset.union(resultSet', resultSet'')
-																end
-						| (OPER {jump = SOME _, ...}, _) => raise Fail "Error - liveness: LABEL con más de dos etiquetas"
-						| (MOVE _, n) => Splayset.add(resultSet, n+1)
-						| (LABEL _, _) => resultSet (* is this case ok? *)
-				end
-
-			(* fromNumToNode : int Splayset.set -> node Splayset.set *)
-			fun fromNumToNode intSet = 
-				let
-					fun toNode num = case Splayset.find (fn (_, n) => 
-						if n=num then true else false) instrGraph of
-						SOME node => node
-						| NONE => raise Fail "Error - liveness: número de nodo no encontrado en el grafo de instrucciones"
-				in
-					utils.setMap toNode intSet compareNodes
-				end
-
-
+			
 			(* calculateUseSet : node -> tigertemp.temp Splayset.set *)
 			fun calculateUseSet node =
 				let
@@ -106,7 +143,7 @@ struct
 																Array.sub (liveOutArray, n))
 
 						(* succNodes : node Splayset.set. Set of successors nodes of input node *)
-						val succNodes = fromNumToNode (successors node)
+						val succNodes = fromNumToNode (successors node iGraph) iGraph
 
 						val succNodesToList = Splayset.listItems(succNodes)
 
@@ -136,37 +173,42 @@ struct
 
 			(* Compute liveness *)
 			val _ = computationByIteration nodesList true
-
 		in
-			List.map (fn (_, n) => 
-				Array.sub(liveOutArray, n)) nodesList
+			(List.map (fn (_, n) => 
+				Array.sub(liveOutArray, n)) nodesList,
+			iGraph)
 		end
 
 	fun liveOutInfoToString instrList =
 		let
-			(* setList : tigertemp.temp Splayset.set list *)
-			val setList = calculateLiveOut instrList
+			(* liveOutList : tigertemp.temp Splatset.set list
+			iGraph : node Splayset.set
+			*)
+			val (liveOutList, iGraph) = calculateLiveOut instrList
 
-			(* setList' : string list
-			tigertemp.temp Splayset.set's to "string sets" (temporaries). 
-			Each position in the list corresponds to a node in nodesList *)
-			val setList' = List.map (fn set => 
-				utils.setToString set (fn x => x)) setList
+			val iGraphList : node list = Splayset.listItems iGraph
 
-			(* nodesList : (tigerassem.instr * string) list *)
-			val nodesList = ListPair.zip(instrList, setList')
+			val iGraphList' = List.map (fn (node as (instr, n)) => 
+				let
+					val instrStr : string = tigerassem.format tigertemp.makeString instr
+					val nStr : string = Int.toString n
+					val succSet : int Splayset.set = successors node iGraph
+					val succSetStr : string = utils.setToString succSet Int.toString
+					val liveOutSet : tigertemp.temp Splayset.set = List.nth(liveOutList, n)
+					val liveOutStr : string = utils.setToString liveOutSet (fn x => x)
 
-			(* nodeslist' : (string * string) list
-			Assembly instructions together with their corresponding 
-			set of live-out temporaries *)
-			val nodesList' = List.map (fn (instr, tmpSetStr) => 
-				(tigerassem.format tigertemp.makeString instr, tmpSetStr)) nodesList
-
-			(* Just eliminates the last char (\n) from an assembly instruction, for 
-			printing purpose *)
-			val nodesList'' = List.map (fn (instrStr, tmpSetStr) => 
-				(String.substring(instrStr, 0, (String.size instrStr) - 1), tmpSetStr)) nodesList'
+					(* Just deletes last \n char *)
+					val instrStr' : string = String.substring(instrStr, 0, (String.size instrStr) - 1)
+				in
+					(instrStr',
+					nStr,
+					succSetStr,
+					liveOutStr)
+				end) iGraphList
 		in
-			nodesList''
+			iGraphList'
 		end
+
+	(* Is this the way to handle ALL Subscript errors? *)
+	handle Subscript => raise Fail "Error - liveness"
 end
