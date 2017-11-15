@@ -208,7 +208,4 @@ struct
 		in
 			iGraphList'
 		end
-
-	(* Is this the way to handle ALL Subscript errors? *)
-	handle Subscript => raise Fail "Error - liveness"
 end
