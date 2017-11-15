@@ -111,34 +111,41 @@ fun main(args) =
        	val _ = if code 
        			then 
        				List.app (fn (fName, instrStrList) => 
-       					(print("\n"^fName^":\n");
+       					(print("\n"^fName^":\n\n");
        						List.app print instrStrList)) assemBodyFormatted
        			else 
        				()
 
-       	(* Liveness analysis info *)
+       	(* Liveness analysis *)
 
-       	(* liveOutInfo : ((string * string) list * string) list *)
-       	val liveOutInfo : ((string * string) list * string) list = List.map (fn (instrList, frame) => 
-       		(tigerliveness.liveOutInfoToString instrList, tigerframe.name frame)) procsToAssem
+       	val liveOutInfo : (string * (string * string * string * string) list) list  = List.map (fn (instrList, frame) => 
+       		let
+       			val info = tigerliveness.liveOutInfoToString instrList
+       			val fName = tigerframe.name frame
+       		in
+       			(fName, info)
+       		end) procsToAssem
 
-       	val liveOutInfo' : (string list * string) list = List.map (fn (assemLiveOutList, frameName) => 
-       		(List.map (fn (assemStr, tmpSetStr) => 
+       	(* Concat live-out info in one string *)
+       	val liveOutInfo' : (string * string list) list = List.map (fn (fName, liveOutInfoToStringList) => 
+       		(fName, List.map (fn (instrStr, nStr, succSetStr, liveOutStr) => 
        			let
-       				val concatValues = assemStr^"\t"^"live-out registers = "^tmpSetStr^"\n"
+       				val concatValues = "("^instrStr^";\tnode = "^nStr^";\tsuccs = "^succSetStr^";\tlive-out = "^liveOutStr^")\n"
        			in
        				concatValues
-       			end) assemLiveOutList, frameName)) liveOutInfo
-
+       			end) liveOutInfoToStringList)) liveOutInfo
 
        	(* -liveout OPTION *)
        	val _ = if liveout 
        			then 
-       				List.app (fn (assemLiveOutList, frameName) => 
-			       		(print("\n"^frameName^":\n");
-			       		List.app print assemLiveOutList)) liveOutInfo' 
+       				List.app (fn (fName, liveOutInfoToStringList) => 
+       					(print("\n"^fName^":\t(instr list length = "^Int.toString (List.length liveOutInfoToStringList)^")\n\n");
+       					List.app print liveOutInfoToStringList)) liveOutInfo'
        			else 
-       				()
+       				() 
+
+       	
+
 	in
 		print "\nyes!!, end of tigermain without any errors\n"
 	end	handle Fail s => print("Fail: "^s^"\n")
