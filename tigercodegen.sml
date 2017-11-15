@@ -208,8 +208,7 @@ struct
 					let
 						val diff = length args - length (tigerframe.argregs)
 					in
-						(saveCallerSaves();
-						emit(OPER{
+						(emit(OPER{
 								assem="call "^f^"\n",
 								src=munchArgs args,
 								dst=tigerframe.calldefs,
@@ -224,8 +223,7 @@ struct
 									jump=NONE
 								}) 
 						else 
-							();
-						restoreCallerSaves())
+							())
 					end
 
 				| munchStm(EXP(CALL _)) = raise Fail "Error - munchStm(): CALL sin label"
@@ -538,16 +536,15 @@ struct
 						generateTmp(fn r => 
 							(munchStm(MOVE(TEMP tigerframe.rax, e1));
 							emit(OPER{
-									assem="cqto\n",					(* cqo: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
+									assem="cqto\n",					(* cqto: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
 																	broadcasts the sign bit of RAX into every bit of RDX *)
-									src=[tigerframe.rax],
+									src=[],
 									dst=[tigerframe.rdx],
 									jump=NONE
 								});
 							emit(OPER{
-									assem="idivq `s2\n",			(* idivq: Signed divide RDX:RAX by tmpe2. Quotient stored in RAX. Remainder stored in RDX *)
+									assem="idivq `s1\n",			(* idivq: Signed divide RDX:RAX by tmpe2. Quotient stored in RAX. Remainder stored in RDX *)
 									src=[tigerframe.rax,
-										tigerframe.rdx,
 										tmpe2],
 									dst=[tigerframe.rax,
 										tigerframe.rdx],
@@ -565,9 +562,8 @@ struct
 						generateTmp(fn r => 
 							(munchStm(MOVE(TEMP tigerframe.rax, e1));
 							emit(OPER{
-									assem="imulq `s2\n",
+									assem="imulq `s1\n",
 									src=[tigerframe.rax,
-										tigerframe.rdx,
 										tmpe2],
 									dst=[tigerframe.rax,
 										tigerframe.rdx],
