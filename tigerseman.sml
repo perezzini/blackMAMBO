@@ -526,7 +526,7 @@ fun transExp(venv, tenv) =
 							(* Analizo los tipos de los argumentos de la función, en busca de alguno no definido en tenv *)
 							val arguments = traducirParams params
 
-							val funLabel = if name = "_tigermain" then name else name^"_"^newlabel()
+							val funLabel = if name = "_tigermain" then name else "_"^name^"_"^newlabel()
 							val funLevel = newLevel{parent=topLevel(),
 													name=funLabel,
 													formals=map (! o #escape) params}
