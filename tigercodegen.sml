@@ -538,7 +538,7 @@ struct
 							emit(OPER{
 									assem="cqto\n",					(* cqto: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
 																	broadcasts the sign bit of RAX into every bit of RDX *)
-									src=[],
+									src=[tigerframe.rax],
 									dst=[tigerframe.rdx],
 									jump=NONE
 								});
@@ -558,18 +558,18 @@ struct
 				| munchExp(BINOP(MUL, e1, e2)) =
 					let
 						val tmpe2 = munchExp e2
+						val tmpe1 = tigertemp.newtemp()
 					in
 						generateTmp(fn r => 
-							(munchStm(MOVE(TEMP tigerframe.rax, e1));
+							(munchStm(MOVE(TEMP tmpe1, e1));
 							emit(OPER{
-									assem="imulq `s1\n",
-									src=[tigerframe.rax,
+									assem="imulq `s0 `s1\n",
+									src=[tmpe1,
 										tmpe2],
-									dst=[tigerframe.rax,
-										tigerframe.rdx],
+									dst=[tmpe1],
 									jump=NONE
 								});
-							munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))
+							munchStm(MOVE(TEMP r, TEMP tmpe1))))
 					end
 
 				| munchExp(BINOP(_,_,_)) = raise Fail "Error - munchExp(): operación binaria no soportada"
