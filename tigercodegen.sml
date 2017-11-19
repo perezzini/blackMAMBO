@@ -18,12 +18,6 @@ struct
 	open tigerassem
 	open tigertree
 
-	fun intToString i = if i < 0 
-						then 
-							"-"^Int.toString(~i) 
-						else 
-							Int.toString(i)
-
 	(* codegen : tigerframe.frame -> tigertree.stm -> tigerassem.instr list *)
 	(* Assuming that 'stm' parameter is canonized *)
 	fun codegen frame (stm : tigertree.stm) : instr list =
@@ -48,7 +42,7 @@ struct
 			a *)
 			fun munchStm(MOVE(MEM(BINOP(PLUS, e1, CONST i)), e2)) = 
 					emit(OPER{
-							assem="movq `s0, "^intToString i^"(`s1)\n",
+							assem="movq `s0, "^utils.intToString i^"(`s1)\n",
 							src=[munchExp e2, munchExp e1],
 							dst=[],
 							jump=NONE
@@ -56,7 +50,7 @@ struct
 
 				| munchStm(MOVE(MEM(BINOP(PLUS, CONST i, e1)), e2)) =
 					emit(OPER{
-							assem="movq `s0, "^intToString i^"(`s1)\n",
+							assem="movq `s0, "^utils.intToString i^"(`s1)\n",
 							src=[munchExp e2, munchExp e1],
 							dst=[],
 							jump=NONE
@@ -64,7 +58,7 @@ struct
 
 				| munchStm(MOVE(MEM(CONST i), e)) =
 					emit(OPER{
-							assem="movq `s0, ("^intToString i^")\n",
+							assem="movq `s0, ("^utils.intToString i^")\n",
 							src=[munchExp e],
 							dst=[],
 							jump=NONE
@@ -82,7 +76,7 @@ struct
 				MOVE(TEMP t, e): Evaluate e and move it to temporary t *)
 				| munchStm(MOVE(TEMP t, MEM(BINOP(PLUS, CONST i, e)))) =
 					emit(OPER{
-							assem="movq "^intToString i^"(`s0), `d0\n",
+							assem="movq "^utils.intToString i^"(`s0), `d0\n",
 							src=[munchExp e],
 							dst=[t],
 							jump=NONE
@@ -90,7 +84,7 @@ struct
 
 				| munchStm(MOVE(TEMP t, MEM(BINOP(PLUS, e, CONST i)))) =
 					emit(OPER{
-							assem="movq "^intToString i^"(`s0), `d0\n",
+							assem="movq "^utils.intToString i^"(`s0), `d0\n",
 							src=[munchExp e],
 							dst=[t],
 							jump=NONE
@@ -106,7 +100,7 @@ struct
 
 				| munchStm(MOVE(TEMP t, CONST i)) =
 					emit(OPER{
-							assem="movq $"^intToString i^", `d0\n",
+							assem="movq $"^utils.intToString i^", `d0\n",
 							src=[],
 							dst=[t],
 							jump=NONE
@@ -217,7 +211,7 @@ struct
 						if diff > 0 
 						then 
 							emit(OPER{
-									assem="addq $"^intToString(diff*(tigerframe.wSz))^", %rsp\n",
+									assem="addq $"^utils.intToString(diff*(tigerframe.wSz))^", %rsp\n",
 									src=[],
 									dst=[],
 									jump=NONE
@@ -264,7 +258,7 @@ struct
 									let 
 										val _ = case a of
 											CONST i => emit(OPER{
-													assem="pushq $"^intToString i^"\n",
+													assem="pushq $"^utils.intToString i^"\n",
 													src=[],
 													dst=[],
 													jump=NONE
@@ -288,7 +282,7 @@ struct
 													jump=NONE
 												})
 											| MEM(BINOP(PLUS, e, CONST i)) => emit(OPER{
-													assem="pushq "^intToString i^"(`s0)\n",
+													assem="pushq "^utils.intToString i^"(`s0)\n",
 													src=[munchExp e],
 													dst=[],
 													jump=NONE
@@ -322,7 +316,7 @@ struct
 			and munchExp(MEM(BINOP(PLUS, e, CONST i))) =
 					generateTmp(fn r => 
 						emit(OPER{
-								assem="addq "^intToString i^"(`s0)\n",
+								assem="addq "^utils.intToString i^"(`s0)\n",
 								src=[munchExp e],
 								dst=[r],
 								jump=NONE
@@ -331,7 +325,7 @@ struct
 				| munchExp(MEM(BINOP(PLUS, CONST i, e))) =
 					generateTmp(fn r => 
 						emit(OPER{
-								assem="addq "^intToString i^"(`s0)\n",
+								assem="addq "^utils.intToString i^"(`s0)\n",
 								src=[munchExp e],
 								dst=[r],
 								jump=NONE
@@ -364,7 +358,7 @@ struct
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="addq $"^intToString i^", `d0\n",
+								assem="addq $"^utils.intToString i^", `d0\n",
 								src=[r],
 								dst=[r],
 								jump=NONE
@@ -404,7 +398,7 @@ struct
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="addq "^intToString i^"(`s1), `d0\n",
+								assem="addq "^utils.intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
@@ -414,7 +408,7 @@ struct
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="addq "^intToString i^"(`s1), `d0\n",
+								assem="addq "^utils.intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
@@ -448,7 +442,7 @@ struct
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="subq $"^intToString i^", `d0\n",
+								assem="subq $"^utils.intToString i^", `d0\n",
 								src=[r],
 								dst=[r],
 								jump=NONE
@@ -488,7 +482,7 @@ struct
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="subq "^intToString i^"(`s1), `d0\n",
+								assem="subq "^utils.intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
@@ -498,7 +492,7 @@ struct
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
 						emit(OPER{
-								assem="subq "^intToString i^"(`s1), `d0\n",
+								assem="subq "^utils.intToString i^"(`s1), `d0\n",
 								src=[r, t],
 								dst=[r],
 								jump=NONE
