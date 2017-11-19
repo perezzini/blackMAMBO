@@ -44,6 +44,13 @@ struct
 	datatype access = InFrame of int 
 					| InReg of tigertemp.label
 
+	fun getOffsetFromAccess (InFrame offset) = offset
+		| getOffsetFromAccess _ = raise Fail "Error - frame. getOffsetFromAccess(): no debería pasar"
+
+	fun getLabelFromAccess (InReg label) = label
+		| getLabelFromAccess _ = raise Fail "Error - frame. getLabelFromAccess(): no debería pasar"
+
+	(* 16 64-bits long general-purpose registers *)
 	val rax = "%rax"	(* result register; also used in idiv and imul instructions *)
 	val rbx = "%rbx"	(* miscellaneous register *)
 	val rcx = "%rcx"	(* 4th argument register *)
@@ -76,17 +83,18 @@ struct
 
 	val localsGap = wSz
 
-	val specialregs = [rv, fp, sp]					(* special purpose registers *)
+	val specialregs = [fp, sp]						(* special purpose registers *)
 	val argregs = [rdi, rsi, rdx, rcx, r8, r9]		(* used to pass first 6 parameters to called functions *)
 	val callersaves = [r10, r11]					(* registers that must be preserved by the caller *)
 	val calleesaves = [rbx, r12, r13, r14, r15]		(* registers that must be saved across function calls *)
 	val calldefs = [rv] 
 					@ callersaves
 
-	val registers = specialregs 
+	val registers = [rv]
+					@ specialregs 
 					@ argregs 
 					@ callersaves 
-					@ callersaves	(* all machine registers *)
+					@ calleesaves	(* all machine registers *)
 
 	val argregsNum = List.length argregs
 
@@ -100,6 +108,9 @@ struct
 
 	datatype frag = PROC of {body: tigertree.stm, frame: frame}
 					| STRING of tigertemp.label * string
+
+	(* getNumOfMachineRegisters : unit -> int *)
+	fun getNumOfMachineRegisters() = List.length registers
 
 	(* newFrame : {name: tigertemp.label, formals: bool list} -> frame *)
 	fun newFrame{name, formals} = {

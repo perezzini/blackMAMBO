@@ -22,13 +22,20 @@ val fpPrevLev : int
 val calldefs : tigertemp.temp list
 val callersaves : tigertemp.temp list
 val argregs : tigertemp.temp list
+val specialregs : tigertemp.temp list
+val registers : tigertemp.temp list
 
+val getNumOfMachineRegisters : unit -> int
 
 datatype access = InFrame of int 
 				| InReg of tigertemp.label (* Describes formals and locals that may be in the frame 
 											or in registers. InFrame(X) indicates a memory location 
 											at offset X from the frame pointer. InReg(t84) indicates 
 											that it will be held in "register" t84 *)
+
+val getOffsetFromAccess : access -> int
+
+val getLabelFromAccess : access -> tigertemp.label
 
 val newFrame : {name: tigertemp.label, formals: bool list} -> frame (* Creates a new frame for a function f with k 
 																	formal parameters. Call newFrame{name=f, formals=l}, 
