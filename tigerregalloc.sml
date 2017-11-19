@@ -14,18 +14,22 @@ struct
 
 	val emptyNodeSet : tigertemp.temp Splayset.set = Splayset.empty String.compare
 
+	(* cmpPairs : (tigertemp.temp * tigertemp.temp) * (tigertemp.temp * tigertemp.temp) -> order *)
 	fun cmpPairs ((s1, d1), (s2, d2)) = if s1 = s2 then String.compare(d1, d2) else String.compare(s1, s2)
 
 	val emptyMoveSet : (tigertemp.temp * tigertemp.temp) Splayset.set = Splayset.empty cmpPairs
 
-	val machineRegsSet : tigertemp.temp Splayset.set = Splayset.addList(emptyNodeSet, tigerframe.registers)
-	val machineColoredRegsSet : tigertemp.temp Splayset.set = Splayset.addList(emptyNodeSet, [tigerframe.fp, tigerframe.sp])
+	(* All general-purpose target-machine registers *)
+	val precolored : tigertemp.temp Splayset.set = Splayset.addList(emptyNodeSet, tigerframe.registers)
 
-	val precolored : tigertemp.temp Splayset.set = Splayset.difference(machineRegsSet, machineColoredRegsSet)
-	val k : int = Splayset.numItems precolored
+	val specialRegsSet : tigertemp.temp Splayset.set = Splayset.addList(emptyNodeSet, tigerframe.specialregs)
+
+	(* Number of "colors": available target-machine registers to identify temporaries *)
+	val kColors : tigertemp.temp Splayset.set = Splayset.difference(precolored, specialRegsSet)
+	val k : int = Splayset.numItems kColors
 
 
-	fun regAlloc instrList =
+	fun regAlloc (instrList, frame) =
 		let
 
 			(* DATA STRUCTURES *)
@@ -99,9 +103,14 @@ struct
 			(* a mapping from a node to the list of moves it's associated with *)
 			val moveList : (tigertemp.temp, move Splayset.set) Splaymap.dict ref = ref (Splaymap.mkDict String.compare)
 
-			val alias = ref (Splaymap.mkDict String.compare)
+			(* when a move (u, v) has been coalesced, and v put in coalescedNodes, then 
+				alias(v) = u *)
+			val alias : (tigertemp.temp, tigertemp.temp) Splaymap.dict ref = ref (Splaymap.mkDict String.compare)
 
-			val color = ref (Splaymap.mkDict String.compare)
+			(* the color chosen by the algorithm for a node. For precolored nodes this is initialized to the 
+			given color *)
+			val color : (tigertemp.temp, tigerframe.register) Splaymap.dict ref = ref (List.foldl (fn (reg, dict) => 
+				Splaymap.insert(dict, reg, reg)) (Splaymap.mkDict String.compare) tigerframe.registers)
 
 
 			(* Init liveness info: instruction graph, and live-out set of tmp registers for each node in 
@@ -542,7 +551,8 @@ struct
 
 			(* repeat : unit -> unit *)
 			fun repeat() =
-	            let val _ = if not(Splayset.isEmpty (!simplifyWorklist)) then simplify()
+	            let 
+	            	val _ = if not(Splayset.isEmpty (!simplifyWorklist)) then simplify()
 	                        else if not(Splayset.isEmpty (!worklistMoves)) then coalesce()
 	                        else if not(Splayset.isEmpty (!freezeWorklist)) then freeze()
 	                        else if not(Splayset.isEmpty (!spillWorklist)) then selectSpill()
@@ -557,9 +567,217 @@ struct
 	            	()
 	            end
 
+	        (* assignColors : unit -> unit *)
+	       	fun assignColors() =
+	       		let
+	       			fun whileSelectStackNotEmpty() =
+	       				if (!selectStack) <> [] 
+	       				then 
+	       					let
+	       					 	val n = popStack()
+	       					 	val okColors = ref kColors
+
+	       					 	val peek = case Splaymap.peek(!adjList, n) of
+	       					 		SOME tmpSet => tmpSet
+	       					 		| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
+
+	       					 	val _ = Splayset.app (fn w => 
+	       					 		if Splayset.member(Splayset.union(!coloredNodes, precolored), getAlias w) 
+	       					 		then 
+	       					 			let
+	       					 				val colorAlias = case Splaymap.peek(!color, getAlias w) of
+	       					 					SOME reg => reg
+	       					 					| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
+	       					 			in
+	       					 				okColors := Splayset.difference(!okColors, Splayset.singleton String.compare colorAlias)
+	       					 			end
+	       					 		else 
+	       					 			()) peek
+
+	       					 	val _ = if Splayset.isEmpty (!okColors) 
+			       					 	then 
+			       					 		spilledNodes := Splayset.union(!spilledNodes, Splayset.singleton String.compare n) 
+			       					 	else 
+			       					 		let
+			       					 			val _ = coloredNodes := Splayset.union(!coloredNodes, Splayset.singleton String.compare n)
+			       					 			val c = case Splayset.find (fn _ => true) (!okColors) of
+			       					 				SOME reg => reg
+			       					 				| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
+			       					 			val _ = Splaymap.insert(!color, n, c)
+			       					 		in
+			       					 			()
+			       					 		end
+	       					 in
+	       					 	whileSelectStackNotEmpty()
+	       					 end 
+	       				else 
+	       					()
+	       		in
+	       			(whileSelectStackNotEmpty();
+	       			Splayset.app (fn n => 
+	       				let
+	       					val colorAlias = case Splaymap.peek(!color, getAlias n) of
+	       						SOME reg => reg
+	       						| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
+	       					val _ = Splaymap.insert(!color, n, colorAlias)
+	       				in
+	       					()
+	       				end) (!coalescedNodes))
+	       		end
+
+	       	(* rewriteProgram() allocates memory locations for the spilled nodes temporaries and 
+	       	inserts store and fetch instructions to access them. Those stores and fetches are 
+	       		newly created temporaries (with tiny live ranges). *)
+	       	(* rewriteProgram : unit -> tigerassem.instr list *)
+	       	fun rewriteProgram() =
+	       		let
+	       			(* Table for saving new mem locations for each v in spilledNodes *)
+	       			val memLocTable : (tigertemp.temp, int) Splaymap.dict ref = ref (Splaymap.mkDict String.compare)
+
+	       			val spilledNodesList : tigertemp.temp list = Splayset.listItems (!spilledNodes)
+	       			val spilledNodesList' : (tigertemp.temp * int) list = List.map (fn tmp => 
+	       				(tmp, tigerframe.getOffsetFromAccess(tigerframe.allocLocal frame true))) spilledNodesList
+
+	       			(* Update memLocTable with newly (spilled tmp, offset) pairs created *)
+	       			val _ = List.foldl (fn ((tmp, offset), dict) => 
+	       				Splaymap.insert(dict, tmp, offset)) (!memLocTable) spilledNodesList'
+
+	       			val newTemps : tigertemp.temp Splayset.set ref = ref (Splayset.empty String.compare)
+
+	       			(* newStore : tigertemp.temp -> tigertemp.temp -> tigerassem.instr *)
+	       			fun newStore tmp def =
+	       				let
+	       					val offset = case Splaymap.peek(!memLocTable, def) of
+	       						SOME i => i
+	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newStore() peek error"
+	       				in
+	       					tigerassem.OPER {
+	       						assem = "movq `s0, "^utils.intToString offset^"(`s1) # SPILLED - STORE\n",
+	       						src = [tmp,
+	       							tigerframe.fp],
+	       						dst = [],
+	       						jump = NONE
+	       					}
+	       				end
+
+	       			(* newLoad : tigertemp.temp -> tigertemp.temp -> tigerassem.instr *)
+	       			fun newLoad tmp use =
+	       				let
+	       					val offset = case Splaymap.peek(!memLocTable, use) of
+	       						SOME i => i
+	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newLoad() peek error"
+	       				in
+	       					tigerassem.OPER {
+	       						assem = "movq `d0, "^utils.intToString offset^"(`s0) # SPILLED - LOAD\n",
+	       						src = [tigerframe.fp],
+	       						dst = [tmp],
+	       						jump = NONE
+	       					}
+	       				end
+
+
+	       		in
+	       			(* this has to be a list of tigerassem.instr *)
+	       			[]
+	       		end
+
+	       	(* checkInvariants : unit -> unit *)
+	       	fun checkInvariants() =
+	       		let
+	       			(* INVARIANTS. After build(), the following invariants always hold *)
+
+	       			fun degreeInv() =
+	       				let
+	       					val union = Splayset.union(Splayset.union(!simplifyWorklist, !freezeWorklist), !spillWorklist)
+	       					val u = case Splayset.find (fn _ => true) union of
+	       						SOME tmp => tmp
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). degreeInv() find error"
+	       					val degree = case Splaymap.peek(!degree, u) of
+	       						SOME i => i
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). degreeInv() peek error"
+
+	       					val adjListU = case Splaymap.peek(!adjList, u) of
+	       						SOME tmpSet => tmpSet
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). degreeInv() peek error"
+
+	       					val cardinality = Splayset.numItems (Splayset.intersection(adjListU, Splayset.union(precolored, union)))
+	       				in
+	       					degree = cardinality
+	       				end
+
+	       			fun simplifyWorklistInv() =
+	       				let
+	       					val u = case Splayset.find (fn _ => true) (!simplifyWorklist) of
+	       						SOME tmp => tmp
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). simplifyWorklistInv() find error"
+	       					val degree = case Splaymap.peek(!degree, u) of
+	       						SOME i => i
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). simplifyWorklistInv() peek error"
+	       					val moveListU = case Splaymap.peek(!moveList, u) of
+	       						SOME moveSet => moveSet
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). simplifyWorklistInv() peek error"
+	       				in
+	       					degree < k andalso Splayset.isEmpty (Splayset.intersection (moveListU, Splayset.union (!activeMoves, !worklistMoves)))
+	       				end
+
+	       			fun freezeWorklistInv() =
+	       				let
+	       					val u = case Splayset.find (fn _ => true) (!freezeWorklist) of
+	       						SOME tmp => tmp
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). freezeWorklistInv() find error"
+	       					val degree = case Splaymap.peek(!degree, u) of
+	       						SOME i => i
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). freezeWorklistInv() peek error"
+	       					val moveListU = case Splaymap.peek(!moveList, u) of
+	       						SOME moveSet => moveSet
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). freezeWorklistInv() peek error"
+	       				in
+	       					degree < k andalso not(Splayset.isEmpty (Splayset.intersection (moveListU, Splayset.union (!activeMoves, !worklistMoves))))
+	       				end
+
+	       			fun spillWorklistInv() =
+	       				let
+	       					val u = case Splayset.find (fn _ => true) (!spillWorklist) of
+	       						SOME tmp => tmp
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). spillWorklist() find error"
+	       					val degree = case Splaymap.peek(!degree, u) of
+	       						SOME i => i
+	       						| NONE => raise Fail "Error - regAlloc. checkInvariants(). spillWorklist() peek error"
+	       				in
+	       					degree >= k
+	       				end
+	       		in
+	       			print("\n**Invariants from Register Allocation algorithm:\n"^
+	       				"\ndegreeInv = "^Bool.toString (degreeInv())^
+	       				"\nsimplifyWorklistInv = "^Bool.toString (simplifyWorklistInv())^
+	       				"\nfreezeWorklistInv = "^Bool.toString (freezeWorklistInv())^
+	       				"\nspillWorklistInn = "^Bool.toString (spillWorklistInv())^
+	       				"\n")
+	       		end
+
 
 		in
-			()
+			(livenessAnalysis();
+			build();
+			checkInvariants();
+			makeWorklist();
+			repeat();
+			assignColors();
+			if not(Splayset.isEmpty (!spilledNodes))
+			then 
+				let
+					val newInstrList = rewriteProgram();
+
+					(* perform algorithm all over again with new 
+						altered graph *)
+					val _ = regAlloc(newInstrList, frame)
+				in
+					()
+				end
+
+			else 
+				();
+			(!color))	
 		end
 
 end
