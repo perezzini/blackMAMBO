@@ -1,8 +1,14 @@
 signature utils = 
 sig
-	val listToString : 'a list -> ('a -> string) -> string 									(* Converts list to string *)
+	(* Converts list to string *)
+	val listToString : 'a list -> ('a -> string) -> string
 
-	val setMap : ('a -> 'b) -> 'a Splayset.set -> ('b * 'b -> order) -> 'b Splayset.set 	(* Maps a set of elements *)
+	(* Maps a set of elements. Only specified when the 2nd parameter
+	it is not a set of sets *)
+	val setMap : ('a -> 'b) -> 'a Splayset.set -> ('b * 'b -> order) -> 'b Splayset.set
 
-	val setToString : 'a Splayset.set -> ('a -> string) -> string 							(* Converts set to string *)
+	(* Converts set to string *)
+	val setToString : 'a Splayset.set -> ('a -> string) -> string
+
+	val intToString : int -> string
 end
