@@ -39,4 +39,20 @@ struct
 						else 
 							Int.toString(i)
 
+	fun pairToString (pair as (a, b)) aToString bToString =
+		let
+			val aStr = aToString a
+			val bStr = bToString b
+		in
+			String.concat [
+				"(",
+				aStr,
+				",",
+				bStr,
+				")"
+			]
+		end
+
+	fun id x = x
+
 end

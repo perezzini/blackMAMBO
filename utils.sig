@@ -10,5 +10,12 @@ sig
 	(* Converts set to string *)
 	val setToString : 'a Splayset.set -> ('a -> string) -> string
 
+	(* Converts int to string *)
 	val intToString : int -> string
+
+	(* Converts a polymorphic pair to string *)
+	val pairToString : ('a * 'b) -> ('a -> string) -> ('b -> string) -> string
+
+	(* Identity function *)
+	val id : 'a -> 'a
 end
