@@ -21,6 +21,14 @@ struct
 					dst: temp,
 					src: temp}
 
+	(* isMoveInstruction : tigerassem.instr -> bool *)	
+	fun isMoveInstruction (MOVE _) = true
+		| isMoveInstruction _ = false
+
+	(* getSrcDstFromMoveInstruction : tigerassem.instr -> {src : tigertemp.temp, dst : tigertemp.temp} *)
+	fun getSrcDstFromMoveInstruction (MOVE {dst, src, ...}) = {src=src, dst=dst}
+		| getSrcDstFromMoveInstruction _ = raise Fail "Error - tigerassem. Tratando de obtener src y dst de una instrucción que no es MOVE"
+
 	fun format saytemp =
 	    let 
 			fun speak(assem,dst,src,jump) =
