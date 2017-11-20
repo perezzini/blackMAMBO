@@ -30,9 +30,11 @@ val outermost: level = {parent = NONE,
 fun newLevel{parent={parent, frame, level}, name, formals} =
 	let
 		(* Debugging *)
+		(*
 		val _ = print("\n**DEBUGGING from tigertrans.newLevel. Function name: "^name^"\n")
 		val _ = print(name^"'s function parent name: "^tigerframe.name (frame)^"\n")
 		val _ = print(name^"'s function parent level number: "^Int.toString(level)^"\n")
+		*)
 	in
 		{parent=SOME frame,
 		frame=newFrame{name=name, 
@@ -375,9 +377,11 @@ fun callExp (name, external, isproc, lev:level, ls) =
 			| _ => "NONE"
 
 		(* Debugging *)
+		(*
 		val _ = print("\n**DEBUGGING from tigertrans.callExp. Function name: "^name^"\n")
 		val _ = print("callee ("^name^") level = "^Int.toString(calleeLev)^"\n")
 		val _ = print("caller ("^callerName^") level = "^Int.toString(callerLev)^"\n")
+		*)
 
 		val fplev = if calleeLev = callerLev then 
 						MEM(BINOP(PLUS, TEMP tigerframe.fp, CONST tigerframe.fpPrevLev)) (* 1er CASO *)
