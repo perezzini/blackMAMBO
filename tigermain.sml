@@ -23,9 +23,10 @@ fun main(args) =
 		val (inter, l7)		= arg(l6, "-inter")
 		val (debug, l8)		= arg(l7, "-debug")
 		val (liveout, l9)	= arg(l8, "-liveout")
+    val (color, l10)  = arg(l9, "-color")
 
 		val entrada =
-			case l9 of 	(* Remember to change this value in case of new options *)
+			case l10 of 	(* Remember to change this value in case of new options *)
 			[n] => ((open_in n)
 					handle _ => raise Fail (n^" no existe"))
 			| [] => std_in
@@ -68,8 +69,7 @@ fun main(args) =
 		strings : tigerframe.frag list - STRING *)
 		val (procs, strings) = fragPartition fragments ([], [])
 
-		(* procsCanonized : (tigertree.stm list * tigertemp.label) list *)
-		val procsCanonized = List.map (fn {body, frame} => 
+		val procsCanonized : (tigertree.stm list * tigerframe.frame) list = List.map (fn {body, frame} => 
 			(canonize body, frame)) procs
 
 		(* -canon OPTION *)
@@ -88,8 +88,7 @@ fun main(args) =
         		else 
         			()
 
-        (* procsToAssem : (tigertree.stm list * tigertemp.label) list -> (tigerassem.instr list * tigertemp.label) list *)
-       	val procsToAssem = List.map (fn (cbody, frame) => 
+       	val procsToAssem : (tigerassem.instr list * tigerframe.frame) list = List.map (fn (cbody, frame) => 
        		let
        			val instrList = List.concat (List.map (tigercodegen.codegen frame) cbody)	(* cbody is a tigertree.stm list;
        																						tigercodegen.codegen returns a instr list. Then, we have to flat a list of lists *)
@@ -100,8 +99,7 @@ fun main(args) =
        		end) procsCanonized
 
        	(* Now, let's format each body converted to assembly language *)
-       	(* assemBodyFormatted : (tigerassem.instr list * tigertemp.label) list -> (tigertemp.label * string list) list *)
-       	val assemBodyFormatted = List.map (fn (ilist, frame) => 
+       	val assemBodyFormatted : (tigertemp.label * string list) list = List.map (fn (ilist, frame) => 
        		(tigerframe.name frame, 
        			List.map (tigerassem.format tigertemp.makeString) ilist)) procsToAssem	(* Since I have not done register assignment yet, I just pass 
        																				tigertemp.makeString to format as the translation function from 
@@ -116,7 +114,8 @@ fun main(args) =
        			else 
        				()
 
-       	(* Liveness analysis *)
+
+       	(* LIVENESS ANALYSIS *)
 
        	val liveOutInfo : (string * (string * string * string * string) list) list  = List.map (fn (instrList, frame) => 
        		let
@@ -142,8 +141,32 @@ fun main(args) =
        					(print("\n"^fName^":\t(instr list length = "^Int.toString (List.length liveOutInfoToStringList)^")\n\n");
        					List.app print liveOutInfoToStringList)) liveOutInfo'
        			else 
-       				() 
+       				()
 
+
+        (* REGISTER ALLOCATION *)
+
+        (* Coloring of temporaries per instruction list (program) *)
+        val regAllocation : (tigerregalloc.allocation * tigerframe.frame) list = List.map (fn (instrList, frame) => 
+          (tigerregalloc.regAlloc (instrList, frame), frame)) procsToAssem
+
+        (* Dictionary to list, and function name *)
+        val regAllocationList : ((tigertemp.temp * tigerframe.register) list * string) list = List.map (fn (allocDict, frame) => 
+          (Splaymap.listItems allocDict, tigerframe.name frame)) regAllocation
+
+
+        (* -color OPTION
+        val _ = if color 
+                then 
+                  (List.app (fn (fName, liveOutInfoToStringList) => 
+                    (print("\n"^fName^"\n\n");
+                    List.app print liveOutInfoToStringList)) liveOutInfo';
+                  List.app (fn (pairList, _) => 
+                    List.app (fn pair => 
+                      print("\n"^tigerregalloc.allocPairToString pair^"\n")) pairList) regAllocationList)
+                else 
+                  ()
+        *)
        	
 
 	in
