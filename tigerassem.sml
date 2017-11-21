@@ -21,6 +21,16 @@ struct
 					dst: temp,
 					src: temp}
 
+	(* instrSrcsToList : instr -> temp list *)
+	fun instrSrcsToList (OPER r) = #src r
+		| instrSrcsToList (LABEL _) = []
+		| instrSrcsToList (MOVE r) = [#src r]
+
+	(* instrDstsToList : instr -> temp list *)
+	fun instrDstsToList (OPER r) = #dst r
+		| instrDstsToList (LABEL _) = []
+		| instrDstsToList (MOVE r) = [#dst r]
+
 	(* isMoveInstruction : tigerassem.instr -> bool *)	
 	fun isMoveInstruction (MOVE _) = true
 		| isMoveInstruction _ = false
