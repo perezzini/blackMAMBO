@@ -1,9 +1,6 @@
 structure tigerregalloc :> tigerregalloc = 
 struct
 
-	open tigerassem
-
-
 	(* Each temp maps a machine register *)
 	type allocation = (tigertemp.temp, tigerframe.register) Splaymap.dict
 
@@ -74,10 +71,13 @@ struct
 
 			(* Stack methods *)
 			fun pushStack n = (selectStack := n :: !selectStack)
-	        fun popStack() = let val h = List.hd (!selectStack)
-	                             val _ = (selectStack := List.tl (!selectStack))
-	                         in h
-	                         end
+	        fun popStack() = 
+        		let 
+					val h = List.hd (!selectStack)
+	             	val _ = (selectStack := List.tl (!selectStack))
+	            in
+	            	h
+	            end
 	        (* End Stack methods *)
 
 
@@ -132,8 +132,8 @@ struct
 
 			
 			(* Prints current iGraph and liveOutTable information *)
-			(* iGraphAndLiveOutInfo : unit -> unit *)
-			fun iGraphAndLiveOutInfo() =
+			(* printIGraphAndLiveOutInfo : unit -> unit *)
+			fun printIGraphAndLiveOutInfo() =
 				let
 					val iGraphList = Splayset.listItems (!iGraph)
 
@@ -158,6 +158,7 @@ struct
 					val (liveOutTableList : tigertemp.temp Splayset.set list, 
 						graph : tigerliveness.node Splayset.set) = tigerliveness.calculateLiveOut instrList
 
+					(* Update iGraph and live-out info *)
 					val _ = iGraph := graph
 					val _ = liveOutTable := liveOutTableList
 
@@ -192,40 +193,40 @@ struct
 					if not(Splayset.member(precolored, u)) 
 					then 
 						(let
-							val peeked = case Splaymap.peek(!adjList, u) of
+							val adjList_u = case Splaymap.peek(!adjList, u) of
 								SOME set => set
 								| NONE => raise Fail "Error - regAlloc. addEdge() peek error"
 
 							val singleton = Splayset.singleton String.compare v
 						in
-							adjList := Splaymap.insert(!adjList, u, Splayset.union(peeked, singleton))
+							adjList := Splaymap.insert(!adjList, u, Splayset.union(adjList_u, singleton))
 						end;
 						let
-							val peeked = case Splaymap.peek(!degree, u) of
+							val degree_u = case Splaymap.peek(!degree, u) of
 								SOME i => i
 								| NONE => raise Fail "Error - regAlloc. addEdge() peek error"
 						in
-							degree := Splaymap.insert(!degree, u, peeked + 1)
+							degree := Splaymap.insert(!degree, u, degree_u + 1)
 						end) 
 					else 
 						();
 					if not(Splayset.member(precolored, v))  
 					then 
 						(let
-							val peeked = case Splaymap.peek(!adjList, v) of
+							val adjList_v = case Splaymap.peek(!adjList, v) of
 								SOME set => set
 								| NONE => raise Fail "Error - regAlloc. addEdge() peek error 1"
 
 							val singleton = Splayset.singleton String.compare u
 						in
-							adjList := Splaymap.insert(!adjList, v, Splayset.union(peeked, singleton))
+							adjList := Splaymap.insert(!adjList, v, Splayset.union(adjList_v, singleton))
 						end;
 						let
-							val peeked = case Splaymap.peek(!degree, v) of
+							val degree_v = case Splaymap.peek(!degree, v) of
 								SOME i => i
 								| NONE => raise Fail "Error - regAlloc. addEdge() peek error 2"
 						in
-							degree := Splaymap.insert(!degree, v, peeked + 1)
+							degree := Splaymap.insert(!degree, v, degree_v + 1)
 						end)  
 					else 
 						())
@@ -285,11 +286,11 @@ struct
 			fun nodeMoves n =
 				let
 					val union = Splayset.union(!activeMoves, !worklistMoves)
-					val peeked = case Splaymap.peek(!moveList, n) of
+					val moveList_n = case Splaymap.peek(!moveList, n) of
 						SOME moveSet => moveSet
 						| NONE => raise Fail "Error - regAlloc. nodeMoves() peek error"
 				in
-					Splayset.intersection(peeked, union)
+					Splayset.intersection(moveList_n, union)
 				end
 
 			(* moveRelated : tigertemp.temp -> bool *)
@@ -299,12 +300,13 @@ struct
 			(* makeWorklist : tigertemp.temp Splayset.set -> unit *)
 			fun makeWorklist() =
 				Splayset.app (fn n => 
+					(initial := Splayset.difference(!initial, Splayset.singleton String.compare n);
 					let
-						val degree = case Splaymap.peek(!degree, n) of
+						val degree_n = case Splaymap.peek(!degree, n) of
 							SOME i => i
 							| NONE => raise Fail "Error - regAlloc. makeWorklist() peek error"
 					in
-						if degree >= k 
+						if degree_n >= k 
 						then 
 							spillWorklist := Splayset.add(!spillWorklist, n) 
 						else 
@@ -313,18 +315,18 @@ struct
 								freezeWorklist := Splayset.add(!freezeWorklist, n) 
 							else 
 								simplifyWorklist := Splayset.add(!simplifyWorklist, n)
-					end) (!initial)
+					end)) (!initial)
 
 			(* adjacent : tigertemp.temp -> tigertemp.temp Splayset.set *)
 			fun adjacent n =
 				let
-					val peeked = case Splaymap.peek(!adjList, n) of
+					val adjList_n = case Splaymap.peek(!adjList, n) of
 						SOME tmpSet => tmpSet
 						| NONE => raise Fail "Error - regAlloc. adjacent() peek error"
 
 					val union = Splayset.union(Splayset.addList(Splayset.empty String.compare, !selectStack), !coalescedNodes)
 				in
-					Splayset.difference(peeked, union)
+					Splayset.difference(adjList_n, union)
 				end
 
 			(* enableMoves : tigertemp.temp Splayset.set -> unit *)
@@ -339,47 +341,46 @@ struct
 							()) (nodeMoves n)) nodes
 
 			(* decrementDegree : tigertemp.temp -> unit *)
-			fun decrementDegree n =
+			fun decrementDegree m =
 				let
-					val singleton = Splayset.singleton String.compare n
+					val singleton_m = Splayset.singleton String.compare m
 
-					val d = case Splaymap.peek(!degree, n) of
+					val d = case Splaymap.peek(!degree, m) of
 						SOME i => i
 						| NONE => raise Fail "Error - regAlloc. decrementDegree() peek error"
 
-					val _ = Splaymap.insert(!degree, n, d - 1)
+					val _ = degree := Splaymap.insert(!degree, m, d - 1)
 				in
 					if d = k 
 					then 
-						(enableMoves (Splayset.union(singleton, adjacent n));
-						spillWorklist := Splayset.difference(!spillWorklist, singleton);
-						if moveRelated n 
+						(enableMoves (Splayset.union(singleton_m, adjacent m));
+						spillWorklist := Splayset.difference(!spillWorklist, singleton_m);
+						if moveRelated m
 						then 
-							freezeWorklist := Splayset.union(!freezeWorklist, singleton) 
+							freezeWorklist := Splayset.union(!freezeWorklist, singleton_m) 
 						else 
-							simplifyWorklist := Splayset.union(!simplifyWorklist, singleton)) 
+							simplifyWorklist := Splayset.union(!simplifyWorklist, singleton_m)) 
 					else 
 						()
 				end
-
 
 			(* simplify : unit -> unit *)
 			fun simplify() =
 				case Splayset.find (fn _ => 
 					true) (!simplifyWorklist) of
-					SOME tmp => (simplifyWorklist := Splayset.difference(!simplifyWorklist, Splayset.singleton String.compare tmp);
-								pushStack tmp;
-								Splayset.app decrementDegree (adjacent tmp))
+					SOME n => (simplifyWorklist := Splayset.difference(!simplifyWorklist, Splayset.singleton String.compare n);
+								pushStack n;
+								Splayset.app decrementDegree (adjacent n))
 					| NONE => ()
 
 			(* ok : (tigertemp.temp * tigertemp.temp) -> bool *)
 			fun ok(t,r) =
 				let
-					val degree = case Splaymap.peek(!degree, t) of
+					val degree_t = case Splaymap.peek(!degree, t) of
 						SOME i => i
 						| NONE => raise Fail "Error - regAlloc. ok() peek error"
 				in
-					degree < k orelse Splayset.member(precolored, t) orelse Splayset.member(!adjSet, (t, r))
+					degree_t < k orelse Splayset.member(precolored, t) orelse Splayset.member(!adjSet, (t, r))
 				end
 
 			fun condCoalesce(u, v) = 
@@ -388,17 +389,17 @@ struct
 			(* addWorkList : tigertemp.temp -> unit *)
 			fun addWorkList u = 
 				let
-					val degree = case Splaymap.peek(!degree, u) of
+					val degree_u = case Splaymap.peek(!degree, u) of
 						SOME i => i
 						| NONE => raise Fail "Error - regAlloc. addWorkList() peek error"
 				in
-					if not(Splayset.member(precolored, u)) andalso not(moveRelated u) andalso degree < k  
+					if not(Splayset.member(precolored, u)) andalso not(moveRelated u) andalso degree_u < k  
 					then 
 						let
-							val singleton = Splayset.singleton String.compare u
+							val singleton_u = Splayset.singleton String.compare u
 						in
-							(freezeWorklist := Splayset.difference(!freezeWorklist, singleton);
-							simplifyWorklist := Splayset.union(!simplifyWorklist, singleton))
+							(freezeWorklist := Splayset.difference(!freezeWorklist, singleton_u);
+							simplifyWorklist := Splayset.union(!simplifyWorklist, singleton_u))
 						end
 					else 
 						()
@@ -410,11 +411,11 @@ struct
 					val k' = ref 0
 					val _ = Splayset.app (fn n => 
 						let
-							val degree = case Splaymap.peek(!degree, n) of
+							val degree_n = case Splaymap.peek(!degree, n) of
 								SOME i => i
 								| NONE => raise Fail "Error - regAlloc. conservative() peek error"
 						in
-							if degree >= k 
+							if degree_n >= k 
 							then 
 								k' := !k' + 1 
 							else 
@@ -429,11 +430,11 @@ struct
 				if Splayset.member(!coalescedNodes, n) 
 				then 
 					let
-					 	val peek = case Splaymap.peek(!alias, n) of
+					 	val alias_n = case Splaymap.peek(!alias, n) of
 					 		SOME a => a
 					 		| NONE => raise Fail "Error - regAlloc. getAlias() peek error"
 					 in
-					 	getAlias peek
+					 	getAlias alias_n	
 					 end 
 				else 
 					n
@@ -446,27 +447,27 @@ struct
 					else 
 						spillWorklist := Splayset.difference(!spillWorklist, Splayset.singleton String.compare v);
 				coalescedNodes := Splayset.union(!coalescedNodes, Splayset.singleton String.compare v);
-				Splaymap.insert(!alias, v, u);
+				alias := Splaymap.insert(!alias, v, u);
 				let
-					val moveListU = case Splaymap.peek(!moveList, u) of
+					val moveList_u = case Splaymap.peek(!moveList, u) of
 						SOME pair => pair
 						| NONE => raise Fail "Error - regAlloc. combine() peek error"
 
-					val moveListV = case Splaymap.peek(!moveList, v) of
+					val moveList_v = case Splaymap.peek(!moveList, v) of
 						SOME pair => pair
 						| NONE => raise Fail "Error - regAlloc. combine() peek error"
 				in
-					Splaymap.insert(!moveList, u, Splayset.union(moveListU, moveListV))
+					moveList := Splaymap.insert(!moveList, u, Splayset.union(moveList_u, moveList_v))
 				end;
 				enableMoves(Splayset.singleton String.compare v);
 				Splayset.app (fn t => 
 					(addEdge(t, u); decrementDegree t)) (adjacent v);
 				let
-					val degree = case Splaymap.peek(!degree, u) of
+					val degree_u = case Splaymap.peek(!degree, u) of
 						SOME i => i
 						| NONE => raise Fail "Error - regAlloc. combine() peek error"
 				in
-					if degree >= k andalso Splayset.member(!freezeWorklist, u) 
+					if degree_u >= k andalso Splayset.member(!freezeWorklist, u) 
 					then 
 						(freezeWorklist := Splayset.difference(!freezeWorklist, Splayset.singleton String.compare u);
 						spillWorklist := Splayset.union(!spillWorklist, Splayset.singleton String.compare u)) 
@@ -488,18 +489,18 @@ struct
 												else 
 													(x, y)
 
-												val singleton = Splayset.singleton cmpPairs m
+												val singleton_m = Splayset.singleton cmpPairs m
 
-												val _ = worklistMoves := Splayset.difference(!worklistMoves, singleton)
+												val _ = worklistMoves := Splayset.difference(!worklistMoves, singleton_m)
 											in
 												if u = v 
 												then 
-													(coalescedMoves := Splayset.union(!coalescedMoves, singleton);
+													(coalescedMoves := Splayset.union(!coalescedMoves, singleton_m);
 													addWorkList u) 
 												else 
 													if Splayset.member(precolored, v) orelse Splayset.member(!adjSet, (u, v)) 
 													then 
-														(constrainedMoves := Splayset.union(!constrainedMoves, singleton);
+														(constrainedMoves := Splayset.union(!constrainedMoves, singleton_m);
 														addWorkList u;
 														addWorkList v) 
 													else 
@@ -507,11 +508,11 @@ struct
 															orelse not(Splayset.member(precolored, u)
 																andalso conservative(Splayset.union(adjacent u, adjacent v))) 
 														then 
-															(coalescedMoves := Splayset.union(!coalescedMoves, singleton);
+															(coalescedMoves := Splayset.union(!coalescedMoves, singleton_m);
 															combine(u, v);
 															addWorkList u) 
 														else 
-															activeMoves := Splayset.union(!activeMoves, singleton)
+															activeMoves := Splayset.union(!activeMoves, singleton_m)
 											end
 
 			(* freezeMoves : tigertemp.temp -> unit *)
@@ -527,11 +528,11 @@ struct
 						(activeMoves := Splayset.difference(!activeMoves, Splayset.singleton cmpPairs m);
 						frozenMoves := Splayset.union(!frozenMoves, Splayset.singleton cmpPairs m);
 						let
-							val degree = case Splaymap.peek(!degree, v) of
+							val degree_v = case Splaymap.peek(!degree, v) of
 								SOME i => i
 								| NONE => raise Fail "Error - regAlloc. freezeMoves() peek error"
 						in
-							if Splayset.isEmpty(nodeMoves v) andalso degree < k 
+							if Splayset.isEmpty(nodeMoves v) andalso degree_v < k 
 							then 
 								(freezeWorklist := Splayset.difference(!freezeWorklist, Splayset.singleton String.compare v);
 								simplifyWorklist := Splayset.union(!simplifyWorklist, Splayset.singleton String.compare v)) 
@@ -546,18 +547,17 @@ struct
 				case Splayset.find (fn _ => true) (!freezeWorklist) of
 					NONE => ()
 					| SOME u => let
-						val singleton = Splayset.singleton String.compare u
-					in
-						(freezeWorklist := Splayset.difference(!freezeWorklist, singleton);
-						simplifyWorklist := Splayset.union(!simplifyWorklist, singleton);
-						freezeMoves u)
-					end
+									val singleton_u = Splayset.singleton String.compare u
+								in
+									(freezeWorklist := Splayset.difference(!freezeWorklist, singleton_u);
+									simplifyWorklist := Splayset.union(!simplifyWorklist, singleton_u);
+									freezeMoves u)
+								end
 
 			(* selectSpill : unit -> unit *)
 			fun selectSpill() = 
 				let
 					(* Select a temporary from spillWorkList using the following heuristic *)
-
 					fun chooseMinIndex (tmp, currentMinIndex) =
 						let
 							val tmpIndex = case Int.fromString (String.extract(tmp, 1, NONE)) of
@@ -574,10 +574,10 @@ struct
 					val minIndex = Splayset.foldl chooseMinIndex (tigertemp.lastTempIndex()) (!spillWorklist)
 					val m = "T"^Int.toString minIndex
 
-					val singleton = Splayset.singleton String.compare m
+					val singleton_m = Splayset.singleton String.compare m
 				in
-					(spillWorklist := Splayset.difference(!spillWorklist, singleton);
-					simplifyWorklist := Splayset.union(!simplifyWorklist, singleton);
+					(spillWorklist := Splayset.difference(!spillWorklist, singleton_m);
+					simplifyWorklist := Splayset.union(!simplifyWorklist, singleton_m);
 					freezeMoves m)
 				end
 
@@ -606,10 +606,10 @@ struct
 	       				if (!selectStack) <> [] 
 	       				then 
 	       					let
-	       					 	val n = popStack()
+	       						val n = popStack()
 	       					 	val okColors = ref kColors
 
-	       					 	val peek = case Splaymap.peek(!adjList, n) of
+	       					 	val adjList_n = case Splaymap.peek(!adjList, n) of
 	       					 		SOME tmpSet => tmpSet
 	       					 		| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
 
@@ -617,14 +617,14 @@ struct
 	       					 		if Splayset.member(Splayset.union(!coloredNodes, precolored), getAlias w) 
 	       					 		then 
 	       					 			let
-	       					 				val colorAlias = case Splaymap.peek(!color, getAlias w) of
+	       					 				val colorAlias_w = case Splaymap.peek(!color, getAlias w) of
 	       					 					SOME reg => reg
 	       					 					| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
 	       					 			in
-	       					 				okColors := Splayset.difference(!okColors, Splayset.singleton String.compare colorAlias)
+	       					 				okColors := Splayset.difference(!okColors, Splayset.singleton String.compare colorAlias_w)
 	       					 			end
 	       					 		else 
-	       					 			()) peek
+	       					 			()) adjList_n
 
 	       					 	val _ = if Splayset.isEmpty (!okColors) 
 			       					 	then 
@@ -635,23 +635,23 @@ struct
 			       					 			val c = case Splayset.find (fn _ => true) (!okColors) of
 			       					 				SOME reg => reg
 			       					 				| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
-			       					 			val _ = Splaymap.insert(!color, n, c)
+			       					 			val _ = color := Splaymap.insert(!color, n, c)
 			       					 		in
 			       					 			()
 			       					 		end
-	       					 in
-	       					 	whileSelectStackNotEmpty()
-	       					 end 
+	       					in
+	       						whileSelectStackNotEmpty()
+	       					end
 	       				else 
 	       					()
 	       		in
 	       			(whileSelectStackNotEmpty();
 	       			Splayset.app (fn n => 
 	       				let
-	       					val colorAlias = case Splaymap.peek(!color, getAlias n) of
+	       					val colorAlias_n = case Splaymap.peek(!color, getAlias n) of
 	       						SOME reg => reg
 	       						| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
-	       					val _ = Splaymap.insert(!color, n, colorAlias)
+	       					val _ = color := Splaymap.insert(!color, n, colorAlias_n)
 	       				in
 	       					()
 	       				end) (!coalescedNodes))
@@ -663,29 +663,31 @@ struct
 	       	(* rewriteProgram : unit -> tigerassem.instr list *)
 	       	fun rewriteProgram() =
 	       		let
-	       			(* Table for saving new mem locations for each v in spilledNodes *)
+	       			(* Table for mapping each v in spilledNodes to a memory location *)
 	       			val memLocTable : (tigertemp.temp, int) Splaymap.dict ref = ref (Splaymap.mkDict String.compare)
 
 	       			val spilledNodesList : tigertemp.temp list = Splayset.listItems (!spilledNodes)
+
+	       			(* Allocate memory locations for each v in spilledNodes *)
 	       			val spilledNodesList' : (tigertemp.temp * int) list = List.map (fn tmp => 
 	       				(tmp, tigerframe.getOffsetFromAccess(tigerframe.allocLocal frame true))) spilledNodesList
 
-	       			(* Update memLocTable with newly (spilled tmp, offset) pairs created *)
+	       			(* Update memLocTable *)
 	       			val _ = List.foldl (fn ((tmp, offset), dict) => 
 	       				Splaymap.insert(dict, tmp, offset)) (!memLocTable) spilledNodesList'
 
 	       			val newTemps : tigertemp.temp Splayset.set ref = ref (Splayset.empty String.compare)
 
 	       			(* newStore : tigertemp.temp -> tigertemp.temp -> tigerassem.instr *)
-	       			fun newStore tmp def =
+	       			fun newStore oldTmp newTmp =
 	       				let
-	       					val offset = case Splaymap.peek(!memLocTable, def) of
+	       					val oldTmpOffset = case Splaymap.peek(!memLocTable, oldTmp) of
 	       						SOME i => i
 	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newStore() peek error"
 	       				in
 	       					tigerassem.OPER {
-	       						assem = "movq `s0, "^utils.intToString offset^"(`s1) # SPILLED - STORE\n",
-	       						src = [tmp,
+	       						assem = "movq `s0, "^utils.intToString oldTmpOffset^"(`s1) # SPILLED - STORE\n",
+	       						src = [newTmp,
 	       							tigerframe.fp],
 	       						dst = [],
 	       						jump = NONE
@@ -693,30 +695,111 @@ struct
 	       				end
 
 	       			(* newLoad : tigertemp.temp -> tigertemp.temp -> tigerassem.instr *)
-	       			fun newLoad tmp use =
+	       			fun newLoad newTmp oldTmp =
 	       				let
-	       					val offset = case Splaymap.peek(!memLocTable, use) of
+	       					val oldTmpOffset = case Splaymap.peek(!memLocTable, oldTmp) of
 	       						SOME i => i
 	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newLoad() peek error"
 	       				in
 	       					tigerassem.OPER {
-	       						assem = "movq `d0, "^utils.intToString offset^"(`s0) # SPILLED - LOAD\n",
+	       						assem = "movq "^utils.intToString oldTmpOffset^"(`s0), `d0 # SPILLED - LOAD\n",
 	       						src = [tigerframe.fp],
-	       						dst = [tmp],
+	       						dst = [newTmp],
 	       						jump = NONE
 	       					}
 	       				end
 
+	       			(* rewriteInstruction : tigerassem.instr -> tigerassem.instr list *)
+	       			fun rewriteInstruction (instr as (tigerassem.LABEL l)) = [instr]
+	       				| rewriteInstruction instr =
+	       					let
+	       						val instrUsesSet : tigertemp.temp Splayset.set = Splayset.addList(Splayset.empty String.compare, tigerassem.instrSrcsToList instr)
+	       						val instrDefsSet : tigertemp.temp Splayset.set = Splayset.addList(Splayset.empty String.compare, tigerassem.instrDstsToList instr)
+	       					
+	       						(* Just consider spilled nodes *)
+	       						val instrUsesSpilledSet : tigertemp.temp Splayset.set = Splayset.intersection(instrUsesSet, !spilledNodes)
+	       						val instrDefsSpilledSet : tigertemp.temp Splayset.set = Splayset.intersection(instrDefsSet, !spilledNodes)
 
+	       						(* Convert sets to lists *)
+	       						val instrUsesSpilledList : tigertemp.temp list = Splayset.listItems instrUsesSpilledSet
+	       						val instrDefsSpilledList : tigertemp.temp list = Splayset.listItems instrDefsSpilledSet
+
+	       						(* Create a new temporary v_i for each definition and each use; and put them all into newTemps set *)
+	       						val instrUsesPairList : (tigertemp.temp * tigertemp.temp) list = List.map (fn tmp => 
+	       							let
+	       								val newTmp = tigertemp.newtemp()
+	       								val _ = newTemps := Splayset.add(!newTemps, newTmp)
+	       							in
+	       								(tmp, newTmp)
+	       							end) instrUsesSpilledList
+	       						val instrDefsPairList : (tigertemp.temp * tigertemp.temp) list = List.map (fn tmp => 
+	       							let
+	       								val newTmp = tigertemp.newtemp()
+	       								val _ = newTemps := Splayset.add(!newTemps, newTmp)
+	       							in
+	       								(tmp, newTmp)
+	       							end) instrUsesSpilledList
+
+	       						(* Perform store's and load's *)
+	       						val storesList : tigerassem.instr list = List.map (fn (oldTmp, newTmp) => 
+	       							newStore oldTmp newTmp) instrDefsPairList
+	       						val loadsList : tigerassem.instr list = List.map (fn (oldTmp, newTmp) => 
+	       							newLoad oldTmp newTmp) instrUsesPairList
+
+	       						val _ = print("\ninstrDefsPairList = "^utils.listToString instrDefsPairList allocPairToString^"\n")
+	       						val _ = print("\ninstrUsesPairList = "^utils.listToString instrUsesPairList allocPairToString^"\n")
+
+	       						(* getReplace : tigertemp.temp -> (tigertemp.temp * tigertemp.temp) list -> tigertemp.temp *)
+	       						fun getReplace (tmp : tigertemp.temp) (listOfPairs : (tigertemp.temp * tigertemp.temp) list) =
+	       							let
+	       								val newTmp = case List.find (fn (old, new) => 
+	       									tmp = old) listOfPairs of
+	       									SOME (old, new) => new
+	       									| NONE => raise Fail "Error - regAlloc. rewriteProgram(). rewriteProgram(). getRepĺace(): temporario no encontrado en lista de pares"
+	       							in
+	       								newTmp
+	       							end
+
+	       						(* Now, rewrite instruction placing new recently created temporaries *)
+	       						val newInstr : tigerassem.instr = case instr of
+	       							tigerassem.OPER {assem, src, dst, jump} => tigerassem.OPER {
+	       								assem = assem,
+	       								src = List.map (fn tmp => 
+	       									getReplace tmp instrUsesPairList) src,
+	       								dst = List.map (fn tmp => 
+	       									getReplace tmp instrDefsPairList) dst,
+	       								jump = jump 		
+	       							}
+	       							| tigerassem.MOVE {assem, src, dst} => tigerassem.MOVE {
+	       								assem = assem,
+	       								src = getReplace src instrUsesPairList,
+	       								dst = getReplace dst instrDefsPairList
+	       							}
+	       					in
+	       						(* this has to be a list of tigerassem.instr *)
+	       						storesList
+	       						@ [newInstr]
+	       						@ loadsList
+	       					end
+
+	       			(* Get only instructions from iGraph *)
+	       			val iGraphList : tigerliveness.node list = Splayset.listItems (!iGraph)
+	       			val instrList : tigerassem.instr list = List.map (fn node => 
+	       				tigerliveness.getInstrFromNode node) iGraphList
+
+
+	       			val _ = (spilledNodes := Splayset.empty String.compare;
+	       					initial := Splayset.union(Splayset.union(!coloredNodes, !coalescedNodes), !newTemps);
+	       					coloredNodes := Splayset.empty String.compare;
+	       					coalescedNodes := Splayset.empty String.compare)
 	       		in
-	       			(* this has to be a list of tigerassem.instr *)
-	       			[]
+	       			List.concat (List.map rewriteInstruction instrList) : tigerassem.instr list
 	       		end
 
 	       	(* checkInvariants : unit -> unit *)
 	       	fun checkInvariants() =
 	       		let
-	       			(* INVARIANTS. After build(), the following invariants always hold *)
+	       			(* INVARIANTS. After makeWorklist(), the following invariants always hold *)
 
 	       			fun degreeInv() =
 	       				let
@@ -725,10 +808,11 @@ struct
 
 	       					val boolRes = Splayset.foldl (fn (tmp, b) => 
 	       						(Splaymap.find(!degree, tmp) = Splayset.numItems(Splayset.intersection(unionSet', Splaymap.find(!adjList, tmp)))) andalso b) true unionSet
+	       							handle NotFound => raise Fail "Error - regAlloc. degreeInv(): exception NotFound"
 	       				in
 	       					if not(boolRes) 
 	       					then 
-	       						raise Fail "regAlloc. degreeInv does not hold!" 
+	       						raise Fail "Error - regAlloc. degreeInv does not hold!" 
 	       					else 
 	       						()
 	       				end
@@ -739,10 +823,11 @@ struct
 
 	       					val boolRes = Splayset.foldl (fn (tmp, b) => 
 	       						Splaymap.find(!degree, tmp) < k andalso Splayset.isEmpty(Splayset.intersection(Splaymap.find(!moveList, tmp), unionSet)) andalso b) true (!simplifyWorklist)
+	       							handle NotFound => raise Fail "Error - regAlloc. simplifyWorklistInv(): exception NotFound"
 	       				in
 	       					if not(boolRes) 
 	       					then 
-	       						raise Fail "regAlloc. simplifyWorklistInv does not hold!"  
+	       						raise Fail "Error - regAlloc. simplifyWorklistInv does not hold!"  
 	       					else 
 	       						()
 	       				end
@@ -753,10 +838,11 @@ struct
 
 	       					val boolRes = Splayset.foldl (fn (tmp, b) => 
 	       						Splaymap.find(!degree, tmp) < k andalso not(Splayset.isEmpty(Splayset.intersection(Splaymap.find(!moveList, tmp), unionSet))) andalso b) true (!freezeWorklist)
+	       							handle NotFound => raise Fail "Error - regAlloc. freezeWorklistInv(): exception NotFound"
 	       				in
 	       					if not(boolRes) 
 	       					then 
-	       						raise Fail "regAlloc. freezeWorklistInv does not hold!"  
+	       						raise Fail "Error - regAlloc. freezeWorklistInv does not hold!"  
 	       					else 
 	       						()
 	       				end
@@ -765,10 +851,11 @@ struct
 	       				let
 	       					val boolRes = Splayset.foldl (fn (tmp, b) => 
 	       						Splaymap.find(!degree, tmp) >= k andalso b) true (!spillWorklist)
+	       							handle NotFound => raise Fail "Error - regAlloc. spillWorklistInv(): exception NotFound"
 	       				in
 	       					if not(boolRes) 
 	       					then 
-	       						raise Fail "regAlloc. spillWorklistInv does not hold!"  
+	       						raise Fail "Error - regAlloc. spillWorklistInv does not hold!"  
 	       					else 
 	       						()
 	       				end
@@ -829,6 +916,7 @@ struct
 									print("\n"^"color = "^(utils.listToString color' (fn pair => 
 	       									allocPairToString pair))^"\n")
 								end
+					| "kColors" => print("\n"^"kColors = "^(utils.setToString kColors utils.id)^"\n")
 	       			| _ => raise Fail "Error - regAlloc. printDataStructure(): data structured not considered"
 	       	
 	       	(* printAllDataStructures : unit -> unit *)
@@ -853,6 +941,7 @@ struct
 	       		printDataStructure "degree";
 	       		printDataStructure "moveList";
 	       		printDataStructure "color";
+	       		printDataStructure "kColors";
 	       		print("\n====================\t End all data structures \t====================\n"))
 
 		in
@@ -865,10 +954,8 @@ struct
 			checkInvariants();
 			repeat();
 			print("\n**repeat() DONE\n");
-			printAllDataStructures();
 			assignColors();
 			print("\n**assignColors() DONE\n");
-			printAllDataStructures();
 			if not(Splayset.isEmpty (!spilledNodes))
 			then 
 				let
