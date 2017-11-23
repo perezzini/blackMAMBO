@@ -203,6 +203,7 @@ struct
 
 					(* Just deletes last \n char *)
 					val instrStr' : string = String.substring(instrStr, 0, (String.size instrStr) - 1)
+						handle Subscript => raise Fail "Error - liveness. liveOutInfoToString()"
 				in
 					(instrStr',
 					nStr,
