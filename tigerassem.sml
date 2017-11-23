@@ -7,8 +7,8 @@ struct
 	(* Independent of the chosen target-machine assembly language *)
 	datatype instr = 
 		OPER of {assem: string, 			(* Assembly-lang instruction *)
-				dst: temp list, 			(* A list of operands registers (may be empty) *)
-				src: temp list, 			(* A list of result registers (may be empty) *)
+				dst: temp list, 			(* A list of result registers (may be empty) *)
+				src: temp list, 			(* A list of operands registers (may be empty) *)
 				jump: label list option} 	(* Operations that always fall through to the next 
 											instruction have jump=NONE; other operations have 
 											a list of "target" labels to which they may jump *)
@@ -39,7 +39,8 @@ struct
 	fun getSrcDstFromMoveInstruction (MOVE {dst, src, ...}) = {src=src, dst=dst}
 		| getSrcDstFromMoveInstruction _ = raise Fail "Error - tigerassem. Tratando de obtener src y dst de una instrucción que no es MOVE"
 
-	fun format saytemp =
+	(* format : instr -> string *)
+	fun format (saytemp : string -> tigertemp.temp) : instr -> string =
 	    let 
 			fun speak(assem,dst,src,jump) =
 			    let 
