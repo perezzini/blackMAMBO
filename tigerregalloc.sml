@@ -45,6 +45,7 @@ struct
 			(* Node work-lists, sets, and stacks. The following lists and sets are always mutually disjoint 
 			and every node is always in exactly one of the sets or lists *)
 
+
 			(* temporary registers, not precolored and not yet processed *)
 			val initial : tigertemp.temp Splayset.set ref = ref emptyNodeSet
 
@@ -152,6 +153,84 @@ struct
 					()
 				end
 
+			(* printDataStructure : string -> unit *)
+	       	fun printDataStructure ds =
+	       		case ds of
+	       			"precolored" => print("\n"^"precolored = "^(utils.setToString precolored utils.id)^"\n")
+	       			| "initial" => print("\n"^"initial = "^(utils.setToString (!initial) utils.id)^"\n")
+	       			| "simplifyWorklist" => print("\n"^"simplifyWorklist = "^(utils.setToString (!simplifyWorklist) utils.id)^"\n")
+	       			| "freezeWorklist" => print("\n"^"freezeWorklist = "^(utils.setToString (!freezeWorklist) utils.id)^"\n")
+	       			| "spillWorklist" => print("\n"^"spillWorklist = "^(utils.setToString (!spillWorklist) utils.id)^"\n")
+	       			| "spilledNodes" => print("\n"^"spilledNodes = "^(utils.setToString (!spilledNodes) utils.id)^"\n")
+	       			| "coalescedNodes" => print("\n"^"coalescedNodes = "^(utils.setToString (!coalescedNodes) utils.id)^"\n")
+	       			| "coloredNodes" => print("\n"^"coloredNodes = "^(utils.setToString (!coloredNodes) utils.id)^"\n")
+	       			| "selectStack" => print("\n"^"selectStack = "^(utils.listToString (!selectStack) utils.id)^"\n")
+	       			| "coalescedMoves" => print("\n"^"coalescedMoves = "^(utils.setToString (!coalescedMoves) (fn pair => 
+	       				utils.pairToString pair utils.id utils.id))^"\n")
+	       			| "constrainedMoves" => print("\n"^"constrainedMoves = "^(utils.setToString (!constrainedMoves) (fn pair => 
+	       				utils.pairToString pair utils.id utils.id))^"\n")
+	       			| "frozenMoves" => print("\n"^"frozenMoves = "^(utils.setToString (!frozenMoves) (fn pair => 
+	       				utils.pairToString pair utils.id utils.id))^"\n")
+	       			| "worklistMoves" => print("\n"^"worklistMoves = "^(utils.setToString (!worklistMoves) (fn pair => 
+	       				utils.pairToString pair utils.id utils.id))^"\n")
+	       			| "activeMoves" => print("\n"^"activeMoves = "^(utils.setToString (!activeMoves) (fn pair => 
+	       				utils.pairToString pair utils.id utils.id))^"\n")
+	       			| "adjSet" => print("\n"^"adjSet = "^(utils.setToString (!adjSet) (fn pair => 
+	       				utils.pairToString pair utils.id utils.id))^"\n")
+	       			| "adjList" => let
+					       				val adjList' = Splaymap.listItems (!adjList)
+					       			in
+					       				print("\n"^"adjList = "^(utils.listToString adjList' (fn pair => 
+	       									utils.pairToString pair utils.id (fn tmpSet => utils.setToString tmpSet utils.id)))^"\n")
+					       			end
+					| "degree" => let
+									val degree' = Splaymap.listItems (!degree)
+								in
+									print("\n"^"degree = "^(utils.listToString degree' (fn pair => 
+	       									utils.pairToString pair utils.id Int.toString))^"\n")
+								end
+					| "moveList" => let
+										val moveList' : (tigertemp.temp * move Splayset.set) list = Splaymap.listItems (!moveList)
+										val moveList'' : (tigertemp.temp * string) list = List.map (fn (tmp, moveSet) => 
+											(tmp, utils.setToString moveSet allocPairToString)) moveList'
+									in
+										print("\n"^"moveList = "^(utils.listToString moveList'' (fn pair => 
+	       									utils.pairToString pair utils.id utils.id))^"\n")
+									end
+					| "color" => let
+									val color' = Splaymap.listItems (!color)
+								in
+									print("\n"^"color = "^(utils.listToString color' (fn pair => 
+	       									allocPairToString pair))^"\n")
+								end
+					| "kColors" => print("\n"^"kColors = "^(utils.setToString kColors utils.id)^"\n")
+	       			| _ => raise Fail "Error - regAlloc. printDataStructure(): data structured not considered"
+	       	
+	       	(* printAllDataStructures : unit -> unit *)
+	       	fun printAllDataStructures() =
+	       		(print("\n====================\t Begin all data structures \t====================\n");
+	       		printDataStructure "precolored";
+	       		printDataStructure "initial";
+	       		printDataStructure "simplifyWorklist";
+	       		printDataStructure "freezeWorklist";
+	       		printDataStructure "spillWorklist";
+	       		printDataStructure "spilledNodes";
+	       		printDataStructure "coalescedNodes";
+	       		printDataStructure "coloredNodes";
+	       		printDataStructure "selectStack";
+	       		printDataStructure "coalescedMoves";
+	       		printDataStructure "constrainedMoves";
+	       		printDataStructure "frozenMoves";
+	       		printDataStructure "worklistMoves";
+	       		printDataStructure "activeMoves";
+	       		printDataStructure "adjSet";
+	       		printDataStructure "adjList";
+	       		printDataStructure "degree";
+	       		printDataStructure "moveList";
+	       		printDataStructure "color";
+	       		printDataStructure "kColors";
+	       		print("\n====================\t End all data structures \t====================\n"))
+
 			(* livenessAnalysis : unit -> unit *)
 			fun livenessAnalysis() =
 				let
@@ -172,7 +251,7 @@ struct
 							Splayset.union(useSet, defSet)
 						end) graphList
 
-					(* Gen union *)
+					(* Gen union: all temps from the instruction list *)
 					val allTmpsSet : tigertemp.temp Splayset.set = List.foldl (fn (tmpSet, s) => 
 						Splayset.union(tmpSet, s)) (Splayset.empty String.compare) graphList'
 				in
@@ -215,7 +294,7 @@ struct
 						(let
 							val adjList_v = case Splaymap.peek(!adjList, v) of
 								SOME set => set
-								| NONE => raise Fail "Error - regAlloc. addEdge() peek error 1"
+								| NONE => raise Fail "Error - regAlloc. addEdge() peek error"
 
 							val singleton = Splayset.singleton String.compare u
 						in
@@ -224,7 +303,7 @@ struct
 						let
 							val degree_v = case Splaymap.peek(!degree, v) of
 								SOME i => i
-								| NONE => raise Fail "Error - regAlloc. addEdge() peek error 2"
+								| NONE => raise Fail "Error - regAlloc. addEdge() peek error"
 						in
 							degree := Splaymap.insert(!degree, v, degree_v + 1)
 						end)  
@@ -239,8 +318,6 @@ struct
 					let
 						val instr = tigerliveness.getInstrFromNode node
 						val instrNum = tigerliveness.getNumFromNode node
-
-						(* val _ = print("\nbuild(): instrNum = "^Int.toString instrNum^"\n") *)
 					in
 						(if tigerassem.isMoveInstruction instr 
 						then 
@@ -601,61 +678,61 @@ struct
 
 	        (* assignColors : unit -> unit *)
 	       	fun assignColors() =
-	       		let
-	       			fun whileSelectStackNotEmpty() =
-	       				if (!selectStack) <> [] 
-	       				then 
-	       					let
-	       						val n = popStack()
-	       					 	val okColors = ref kColors
-
-	       					 	val adjList_n = case Splaymap.peek(!adjList, n) of
-	       					 		SOME tmpSet => tmpSet
-	       					 		| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
-
-	       					 	val _ = Splayset.app (fn w => 
-	       					 		if Splayset.member(Splayset.union(!coloredNodes, precolored), getAlias w) 
-	       					 		then 
-	       					 			let
-	       					 				val colorAlias_w = case Splaymap.peek(!color, getAlias w) of
-	       					 					SOME reg => reg
-	       					 					| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
-	       					 			in
-	       					 				okColors := Splayset.difference(!okColors, Splayset.singleton String.compare colorAlias_w)
-	       					 			end
-	       					 		else 
-	       					 			()) adjList_n
-
-	       					 	val _ = if Splayset.isEmpty (!okColors) 
-			       					 	then 
-			       					 		spilledNodes := Splayset.union(!spilledNodes, Splayset.singleton String.compare n) 
-			       					 	else 
-			       					 		let
-			       					 			val _ = coloredNodes := Splayset.union(!coloredNodes, Splayset.singleton String.compare n)
-			       					 			val c = case Splayset.find (fn _ => true) (!okColors) of
-			       					 				SOME reg => reg
-			       					 				| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
-			       					 			val _ = color := Splaymap.insert(!color, n, c)
-			       					 		in
-			       					 			()
-			       					 		end
-	       					in
-	       						whileSelectStackNotEmpty()
-	       					end
-	       				else 
-	       					()
-	       		in
-	       			(whileSelectStackNotEmpty();
-	       			Splayset.app (fn n => 
-	       				let
-	       					val colorAlias_n = case Splaymap.peek(!color, getAlias n) of
-	       						SOME reg => reg
-	       						| NONE => raise Fail "Error - regAlloc. assignColors() peek error"
-	       					val _ = color := Splaymap.insert(!color, n, colorAlias_n)
-	       				in
-	       					()
-	       				end) (!coalescedNodes))
-	       		end
+	            let 
+	            	fun whileStackNotEmpty() =
+	                    if (!selectStack) <> []
+	                    then 
+	                        let 
+	                        	val n = popStack()
+								val okColors = ref kColors
+								val _ = case Splaymap.peek(!adjList, n) of
+									NONE => ()
+									| SOME adjList_n =>
+									    let 
+									    	val union = Splayset.union(!coloredNodes, precolored)
+									    in
+									        Splayset.app (fn w =>
+									            let 
+									            	val alias_w = getAlias w
+									            in
+									             if Splayset.member(union, alias_w)
+									             then 
+									             	let 
+									             		val color_alias_w = Splaymap.find(!color, alias_w)
+								                  	in
+									                   okColors := Splayset.difference(!okColors, Splayset.singleton String.compare color_alias_w)
+								                  	end
+									             else 
+									             	()
+									            end) adjList_n
+									    end
+								val _ = if Splayset.isEmpty(!okColors)
+										then spilledNodes := Splayset.add(!spilledNodes, n)
+										else 
+										let 
+											val _ = (coloredNodes := Splayset.add(!coloredNodes, n))
+										    val c = case Splayset.find (fn _ => true) (!okColors) of
+										        SOME c' => c'
+										        | _ => raise Fail "Error - regAlloc. assignColors(): okColors find error"
+										    val _ = (color := Splaymap.insert(!color, n, c))
+										in 
+											()
+										end
+	                         	in 
+                         			whileStackNotEmpty()
+                         		end
+	                    else 
+	                    	()
+	            in 
+	            	(whileStackNotEmpty();
+            		Splayset.app (fn n =>
+                        let val color_alias_n = case Splaymap.peek(!color, getAlias n) of
+                                SOME c => c
+                                | _ => "" (* is this ok? *)
+                            val _ = (color := Splaymap.insert(!color, n, color_alias_n))
+                        in ()
+                        end) (!coalescedNodes))
+            	end
 
 	       	(* rewriteProgram() allocates memory locations for the spilled nodes temporaries and 
 	       	inserts store and fetch instructions to access them. Those stores and fetches are 
@@ -673,7 +750,7 @@ struct
 	       				(tmp, tigerframe.getOffsetFromAccess(tigerframe.allocLocal frame true))) spilledNodesList
 
 	       			(* Update memLocTable *)
-	       			val _ = List.foldl (fn ((tmp, offset), dict) => 
+	       			val _ = memLocTable := List.foldl (fn ((tmp, offset), dict) => 
 	       				Splaymap.insert(dict, tmp, offset)) (!memLocTable) spilledNodesList'
 
 	       			val newTemps : tigertemp.temp Splayset.set ref = ref (Splayset.empty String.compare)
@@ -695,7 +772,7 @@ struct
 	       				end
 
 	       			(* newLoad : tigertemp.temp -> tigertemp.temp -> tigerassem.instr *)
-	       			fun newLoad newTmp oldTmp =
+	       			fun newLoad oldTmp newTmp =
 	       				let
 	       					val oldTmpOffset = case Splaymap.peek(!memLocTable, oldTmp) of
 	       						SOME i => i
@@ -710,19 +787,25 @@ struct
 	       				end
 
 	       			(* rewriteInstruction : tigerassem.instr -> tigerassem.instr list *)
-	       			fun rewriteInstruction (instr as (tigerassem.LABEL l)) = [instr]
+	       			fun rewriteInstruction (instr as (tigerassem.LABEL _)) = [instr]
 	       				| rewriteInstruction instr =
 	       					let
-	       						val instrUsesSet : tigertemp.temp Splayset.set = Splayset.addList(Splayset.empty String.compare, tigerassem.instrSrcsToList instr)
-	       						val instrDefsSet : tigertemp.temp Splayset.set = Splayset.addList(Splayset.empty String.compare, tigerassem.instrDstsToList instr)
+	       						val instrUsesList : tigertemp.temp list = tigerassem.instrSrcsToList instr
+	       						val instrDefsList : tigertemp.temp list = tigerassem.instrDstsToList instr
 	       					
 	       						(* Just consider spilled nodes *)
-	       						val instrUsesSpilledSet : tigertemp.temp Splayset.set = Splayset.intersection(instrUsesSet, !spilledNodes)
-	       						val instrDefsSpilledSet : tigertemp.temp Splayset.set = Splayset.intersection(instrDefsSet, !spilledNodes)
-
-	       						(* Convert sets to lists *)
-	       						val instrUsesSpilledList : tigertemp.temp list = Splayset.listItems instrUsesSpilledSet
-	       						val instrDefsSpilledList : tigertemp.temp list = Splayset.listItems instrDefsSpilledSet
+	       						val instrUsesSpilledList : tigertemp.temp list = List.filter (fn useTmp => 
+	       							if Splayset.member(!spilledNodes, useTmp) 
+	       							then 
+	       								true 
+	       							else 
+	       								false) instrUsesList
+	       						val instrDefsSpilledList : tigertemp.temp list = List.filter (fn defTmp => 
+	       							if Splayset.member(!spilledNodes, defTmp) 
+	       							then 
+	       								true 
+	       							else 
+	       								false) instrDefsList
 
 	       						(* Create a new temporary v_i for each definition and each use; and put them all into newTemps set *)
 	       						val instrUsesPairList : (tigertemp.temp * tigertemp.temp) list = List.map (fn tmp => 
@@ -746,40 +829,47 @@ struct
 	       						val loadsList : tigerassem.instr list = List.map (fn (oldTmp, newTmp) => 
 	       							newLoad oldTmp newTmp) instrUsesPairList
 
-	       						val _ = print("\ninstrDefsPairList = "^utils.listToString instrDefsPairList allocPairToString^"\n")
-	       						val _ = print("\ninstrUsesPairList = "^utils.listToString instrUsesPairList allocPairToString^"\n")
 
-	       						(* getReplace : tigertemp.temp -> (tigertemp.temp * tigertemp.temp) list -> tigertemp.temp *)
-	       						fun getReplace (tmp : tigertemp.temp) (listOfPairs : (tigertemp.temp * tigertemp.temp) list) =
+	       						(* getReplaceTmp : tigertemp.temp -> (tigertemp.temp * tigertemp.temp) list -> tigertemp.temp *)
+	       						fun getReplaceTmp tmp listOfPairs =
 	       							let
 	       								val newTmp = case List.find (fn (old, new) => 
 	       									tmp = old) listOfPairs of
-	       									SOME (old, new) => new
-	       									| NONE => raise Fail "Error - regAlloc. rewriteProgram(). rewriteProgram(). getRepĺace(): temporario no encontrado en lista de pares"
+	       									SOME (_, new) => new
+	       									| NONE => tmp
 	       							in
 	       								newTmp
 	       							end
+
+	       						(* getReplace : tigertemp.temp list -> (tigertemp.temp * tigertemp.temp) list -> tigertemp.temp list *)
+	       						fun getReplace [] _ = []
+	       							| getReplace l listOfPairs =
+	       								let
+	       									val mapped = List.map (fn tmp => 
+	       										getReplaceTmp tmp listOfPairs) l
+	       								in
+	       									mapped
+	       								end
 
 	       						(* Now, rewrite instruction placing new recently created temporaries *)
 	       						val newInstr : tigerassem.instr = case instr of
 	       							tigerassem.OPER {assem, src, dst, jump} => tigerassem.OPER {
 	       								assem = assem,
-	       								src = List.map (fn tmp => 
-	       									getReplace tmp instrUsesPairList) src,
-	       								dst = List.map (fn tmp => 
-	       									getReplace tmp instrDefsPairList) dst,
+	       								src = getReplace src instrUsesPairList,
+	       								dst = getReplace dst instrDefsPairList,
 	       								jump = jump 		
 	       							}
 	       							| tigerassem.MOVE {assem, src, dst} => tigerassem.MOVE {
 	       								assem = assem,
-	       								src = getReplace src instrUsesPairList,
-	       								dst = getReplace dst instrDefsPairList
+	       								src = getReplaceTmp src instrUsesPairList,
+	       								dst = getReplaceTmp dst instrDefsPairList
 	       							}
+	       							| x => x
 	       					in
 	       						(* this has to be a list of tigerassem.instr *)
-	       						storesList
+	       						loadsList
 	       						@ [newInstr]
-	       						@ loadsList
+	       						@ storesList
 	       					end
 
 	       			(* Get only instructions from iGraph *)
@@ -787,11 +877,6 @@ struct
 	       			val instrList : tigerassem.instr list = List.map (fn node => 
 	       				tigerliveness.getInstrFromNode node) iGraphList
 
-
-	       			val _ = (spilledNodes := Splayset.empty String.compare;
-	       					initial := Splayset.union(Splayset.union(!coloredNodes, !coalescedNodes), !newTemps);
-	       					coloredNodes := Splayset.empty String.compare;
-	       					coalescedNodes := Splayset.empty String.compare)
 	       		in
 	       			List.concat (List.map rewriteInstruction instrList) : tigerassem.instr list
 	       		end
@@ -866,83 +951,20 @@ struct
 	       			spillWorklistInv())
 	       		end
 
-	       	(* printDataStructure : string -> unit *)
-	       	fun printDataStructure ds =
-	       		case ds of
-	       			"precolored" => print("\n"^"precolored = "^(utils.setToString precolored utils.id)^"\n")
-	       			| "initial" => print("\n"^"initial = "^(utils.setToString (!initial) utils.id)^"\n")
-	       			| "simplifyWorklist" => print("\n"^"simplifyWorklist = "^(utils.setToString (!simplifyWorklist) utils.id)^"\n")
-	       			| "freezeWorklist" => print("\n"^"freezeWorklist = "^(utils.setToString (!freezeWorklist) utils.id)^"\n")
-	       			| "spillWorklist" => print("\n"^"spillWorklist = "^(utils.setToString (!spillWorklist) utils.id)^"\n")
-	       			| "spilledNodes" => print("\n"^"spilledNodes = "^(utils.setToString (!spilledNodes) utils.id)^"\n")
-	       			| "coalescedNodes" => print("\n"^"coalescedNodes = "^(utils.setToString (!coalescedNodes) utils.id)^"\n")
-	       			| "coloredNodes" => print("\n"^"coloredNodes = "^(utils.setToString (!coloredNodes) utils.id)^"\n")
-	       			| "selectStack" => print("\n"^"selectStack = "^(utils.listToString (!selectStack) utils.id)^"\n")
-	       			| "coalescedMoves" => print("\n"^"coalescedMoves = "^(utils.setToString (!coalescedMoves) (fn pair => 
-	       				utils.pairToString pair utils.id utils.id))^"\n")
-	       			| "constrainedMoves" => print("\n"^"constrainedMoves = "^(utils.setToString (!constrainedMoves) (fn pair => 
-	       				utils.pairToString pair utils.id utils.id))^"\n")
-	       			| "frozenMoves" => print("\n"^"frozenMoves = "^(utils.setToString (!frozenMoves) (fn pair => 
-	       				utils.pairToString pair utils.id utils.id))^"\n")
-	       			| "worklistMoves" => print("\n"^"worklistMoves = "^(utils.setToString (!worklistMoves) (fn pair => 
-	       				utils.pairToString pair utils.id utils.id))^"\n")
-	       			| "activeMoves" => print("\n"^"activeMoves = "^(utils.setToString (!activeMoves) (fn pair => 
-	       				utils.pairToString pair utils.id utils.id))^"\n")
-	       			| "adjSet" => print("\n"^"adjSet = "^(utils.setToString (!adjSet) (fn pair => 
-	       				utils.pairToString pair utils.id utils.id))^"\n")
-	       			| "adjList" => let
-					       				val adjList' = Splaymap.listItems (!adjList)
-					       			in
-					       				print("\n"^"adjList = "^(utils.listToString adjList' (fn pair => 
-	       									utils.pairToString pair utils.id (fn tmpSet => utils.setToString tmpSet utils.id)))^"\n")
-					       			end
-					| "degree" => let
-									val degree' = Splaymap.listItems (!degree)
-								in
-									print("\n"^"degree = "^(utils.listToString degree' (fn pair => 
-	       									utils.pairToString pair utils.id Int.toString))^"\n")
-								end
-					| "moveList" => let
-										val moveList' : (tigertemp.temp * move Splayset.set) list = Splaymap.listItems (!moveList)
-										val moveList'' : (tigertemp.temp * string) list = List.map (fn (tmp, moveSet) => 
-											(tmp, utils.setToString moveSet allocPairToString)) moveList'
-									in
-										print("\n"^"moveList = "^(utils.listToString moveList'' (fn pair => 
-	       									utils.pairToString pair utils.id utils.id))^"\n")
-									end
-					| "color" => let
-									val color' = Splaymap.listItems (!color)
-								in
-									print("\n"^"color = "^(utils.listToString color' (fn pair => 
-	       									allocPairToString pair))^"\n")
-								end
-					| "kColors" => print("\n"^"kColors = "^(utils.setToString kColors utils.id)^"\n")
-	       			| _ => raise Fail "Error - regAlloc. printDataStructure(): data structured not considered"
-	       	
-	       	(* printAllDataStructures : unit -> unit *)
-	       	fun printAllDataStructures() =
-	       		(print("\n====================\t Begin all data structures \t====================\n");
-	       		printDataStructure "precolored";
-	       		printDataStructure "initial";
-	       		printDataStructure "simplifyWorklist";
-	       		printDataStructure "freezeWorklist";
-	       		printDataStructure "spillWorklist";
-	       		printDataStructure "spilledNodes";
-	       		printDataStructure "coalescedNodes";
-	       		printDataStructure "coloredNodes";
-	       		printDataStructure "selectStack";
-	       		printDataStructure "coalescedMoves";
-	       		printDataStructure "constrainedMoves";
-	       		printDataStructure "frozenMoves";
-	       		printDataStructure "worklistMoves";
-	       		printDataStructure "activeMoves";
-	       		printDataStructure "adjSet";
-	       		printDataStructure "adjList";
-	       		printDataStructure "degree";
-	       		printDataStructure "moveList";
-	       		printDataStructure "color";
-	       		printDataStructure "kColors";
-	       		print("\n====================\t End all data structures \t====================\n"))
+	       	(* deleteMoves : tigerassem.instr -> tigerassem.instr *)
+	       	fun deleteMoves [] = []
+	       		| deleteMoves ((move as tigerassem.MOVE {src, dst, ...}) :: moves) =
+	       			let
+	       				val (src', dst') = (Splaymap.find(!color, src), Splaymap.find(!color, dst))
+	       					handle NotFound => raise Fail "Error - regAlloc. deleteMoves(): find error"
+	       			in
+	       				if src' = dst' 
+	       				then 
+	       					deleteMoves moves 
+	       				else 
+	       					move :: (deleteMoves moves)
+	       			end
+	       		| deleteMoves l = l
 
 		in
 			(livenessAnalysis();
@@ -960,6 +982,7 @@ struct
 			then 
 				let
 					val newInstrList = rewriteProgram();
+					val _ = print("\n**rewriteProgram() DONE\n");
 
 					(* perform algorithm all over again with new 
 						altered graph *)
@@ -969,7 +992,7 @@ struct
 				end
 			else 
 				();
-			(!color))	
+			(!color, deleteMoves instrList))	
 		end
 
 end
