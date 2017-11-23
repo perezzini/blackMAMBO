@@ -7,7 +7,7 @@ sig
 	it is not a set of sets *)
 	val setMap : ('a -> 'b) -> 'a Splayset.set -> ('b * 'b -> order) -> 'b Splayset.set
 
-	(* Converts set to string *)
+	(* Converts a Splayset set to string *)
 	val setToString : 'a Splayset.set -> ('a -> string) -> string
 
 	(* Converts int to string *)
@@ -18,4 +18,7 @@ sig
 
 	(* Identity function *)
 	val id : 'a -> 'a
+
+	(* Converts a Splaymap dict to string *)
+	val dictToString : ('a, 'b) Splaymap.dict -> ('a -> string) -> ('b -> string) -> string
 end

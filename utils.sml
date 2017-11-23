@@ -39,7 +39,7 @@ struct
 						else 
 							Int.toString(i)
 
-	fun pairToString (pair as (a, b)) aToString bToString =
+	fun pairToString (a, b) aToString bToString =
 		let
 			val aStr = aToString a
 			val bStr = bToString b
@@ -54,5 +54,13 @@ struct
 		end
 
 	fun id x = x
+
+	fun dictToString dict aToString bToString =
+		let
+			val dictList = Splaymap.listItems dict
+		in
+			listToString dictList (fn pair => 
+				pairToString pair aToString bToString)
+		end
 
 end
