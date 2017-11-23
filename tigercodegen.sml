@@ -115,22 +115,20 @@ struct
 						})
 
 				| munchStm(MOVE(TEMP t1, TEMP t2)) =
-					emit(OPER{
+					emit(tigerassem.MOVE{
 							assem="movq `s0, `d0\n",
-							src=[t2],
-							dst=[t1],
-							jump=NONE
+							src=t2,
+							dst=t1
 						})
 
 				| munchStm(MOVE(TEMP t, CALL(NAME f, args))) =
 					let
 						val _ = munchStm(EXP(CALL(NAME f, args)))	(* "Execute" call *)
 					in
-						emit(OPER{
+						emit(tigerassem.MOVE{
 								assem="movq `s0, `d0\n",
-								src=[tigerframe.rv],
-								dst=[t],
-								jump=NONE
+								src=tigerframe.rv,
+								dst=t
 							})
 					end
 
