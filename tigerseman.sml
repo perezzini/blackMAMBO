@@ -648,8 +648,7 @@ fun transProg ex =
 																	return Unit as final type of expression. *)
 	in	
 		(* DEBUGGING *)
-		(*(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
-		print "\n")*)
-		()
+		(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
+		print "\n")
 	end
 end

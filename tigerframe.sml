@@ -1,7 +1,7 @@
 (*
 	x64 frame architecture:
 
-		|    argn    |	fp+8*(n+1)
+		|    argn    |	fp+8*(n-5)
 		|    ...     |
 		|    arg8    |	fp+32
 		|    arg7    |	fp+24
@@ -87,14 +87,16 @@ struct
 	val argregs = [rdi, rsi, rdx, rcx, r8, r9]		(* used to pass first 6 parameters to called functions *)
 	val callersaves = [r10, r11]					(* registers that must be preserved by the caller *)
 	val calleesaves = [rbx, r12, r13, r14, r15]		(* registers that must be saved across function calls *)
+	
 	val calldefs = [rv] 
 					@ callersaves
 
+	(* all machine registers *)
 	val registers = [rv]
 					@ specialregs 
 					@ argregs 
 					@ callersaves 
-					@ calleesaves	(* all machine registers *)
+					@ calleesaves
 
 	val argregsNum = List.length argregs
 
@@ -122,8 +124,27 @@ struct
 	(* name : frame -> tigertemp.label *)
 	fun name(f: frame) = #name f
 
+	(* stringLen : string -> int *)
+	fun stringLen (s : string) : int =
+		let	fun aux[] = 0
+			| aux(#"\\":: #"x"::_::_::t) = 1+aux(t)
+			| aux(_::t) = 1+aux(t)
+		in	
+			aux(explode s) 
+		end
+
 	(* string : tigertemp.label * string -> string *)
-	fun string(l, s) = l^tigertemp.makeString(s)^"\n"
+	fun string(l, s) : string =
+		let
+			val len = ".quad "^Int.toString(stringLen s)
+			val str = ".string \""^s^"\""
+		in
+			String.concat [
+				l^":"^"\n",
+				"\t"^len^"\n",
+				"\t"^str^"\n"
+			]
+		end
 
 	(* formals : frame -> access list *)
 	fun formals({formals=f, ...}: frame) = !f
@@ -251,7 +272,7 @@ struct
 		in
 			body
 			@ [tigerassem.OPER{
-				assem="\n",
+				assem="#empty instr\n",
 				src=[rv] @ calleesaves,
 				dst=[],
 				jump=NONE
@@ -263,14 +284,24 @@ struct
 		end
 
 	(* val procEntryExit3 : frame -> string -> string *)
-	(* SCAFFOLD version... *)
-	fun procEntryExit3 (f as {name, ...} : frame) body =
+	(* "body" must be already colored *)
+	fun procEntryExit3 (f as {name, actualLocal, ...} : frame) (body : string) =
 		let
-			val prolog = "PROCEDURE "^name^"\n"
-			val body = body^"\n"
-			val epilog = "END "^name^"\n"
+			val localsSize = (!actualLocal) * wSz * ~1
+
+			val prolog = String.concat [
+				name^":\n",
+				"\t"^"pushq "^rbp^"\n",
+				"\t"^"movq "^rsp^", "^rbp^"\n",
+				"\t"^"subq $"^Int.toString(localsSize)^", "^rsp^"\n"
+			]
+			val body = body
+			val epilog = String.concat [
+				"\t"^"leave\n",
+				"\t"^"ret\n"
+			]
 		in
-			concat [
+			String.concat [
 				prolog,
 				body,
 				epilog
