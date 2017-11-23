@@ -955,8 +955,21 @@ struct
 	       	fun deleteMoves [] = []
 	       		| deleteMoves ((move as tigerassem.MOVE {src, dst, ...}) :: moves) =
 	       			let
-	       				val (src', dst') = (Splaymap.find(!color, src), Splaymap.find(!color, dst))
-	       					handle NotFound => raise Fail "Error - regAlloc. deleteMoves(): find error"
+	       				val src' = case Splaymap.peek(!color, src) of
+	       					SOME tmp => tmp
+	       					| NONE => let
+			       						val _ = print("\nsrc = "^src^"\n")
+			       					in
+			       						raise Fail "Error - regAlloc. deleteMoves(): src not in color dict"
+			       					end
+
+			       		val dst' = case Splaymap.peek(!color, dst) of
+	       					SOME tmp => tmp
+	       					| NONE => let
+			       						val _ = print("\nsrc = "^dst^"\n")
+			       					in
+			       						raise Fail "Error - regAlloc. deleteMoves(): dst not in color dict"
+			       					end
 	       			in
 	       				if src' = dst' 
 	       				then 
@@ -964,7 +977,7 @@ struct
 	       				else 
 	       					move :: (deleteMoves moves)
 	       			end
-	       		| deleteMoves l = l
+	       		| deleteMoves (_ :: l) = deleteMoves l 
 
 		in
 			(livenessAnalysis();
@@ -986,13 +999,13 @@ struct
 
 					(* perform algorithm all over again with new 
 						altered graph *)
-					val _ = regAlloc(newInstrList, frame)
+					val (alloc, instrList') = regAlloc(newInstrList, frame)
 				in
-					()
+					(alloc, deleteMoves instrList')
 				end
 			else 
-				();
-			(!color, deleteMoves instrList))	
+				(!color, deleteMoves instrList)
+			)	
 		end
 
 end
