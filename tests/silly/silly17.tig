@@ -1,0 +1,5 @@
+let
+  var a:int := 2
+in
+  (if a = 2 then print("true") else print("false"); 0)
+end

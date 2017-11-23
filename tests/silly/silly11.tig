@@ -1,0 +1,5 @@
+let
+	function id(x: int, y: int) : int = x + y
+in
+	id(3,4)
+end

@@ -1,0 +1,7 @@
+let
+	var x : int := 10 /* escaped var */
+
+	function f(a : int) : int = x
+in
+	(if f(10)=10 then print("true") else print("false"); 0)
+end

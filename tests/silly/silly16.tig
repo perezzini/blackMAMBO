@@ -1,0 +1,6 @@
+let
+	var a:int := 0
+	var b:int := a+1
+in
+	a
+end
