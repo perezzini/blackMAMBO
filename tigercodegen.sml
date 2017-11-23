@@ -211,8 +211,8 @@ struct
 						if diff > 0 
 						then 
 							emit(OPER{
-									assem="addq $"^utils.intToString(diff*(tigerframe.wSz))^", %rsp\n",
-									src=[],
+									assem="addq $"^utils.intToString(diff*(tigerframe.wSz))^", `s0\n",
+									src=[tigerframe.sp],
 									dst=[],
 									jump=NONE
 								}) 
