@@ -77,8 +77,9 @@ struct
 														end
 				| (OPER {jump = SOME _, ...}, _) => raise Fail "Error - liveness: LABEL con más de dos etiquetas"
 				| (MOVE _, n) => Splayset.add(resultSet, n+1)
-				| (LABEL {lab = "EXIT_LAB", ...}, _) => resultSet
-				| (LABEL _, n) => Splayset.add(resultSet, n+1) (* LABEL cases ok? *)
+				| (LABEL {lab, ...}, n) => case String.isPrefix "EXIT_LAB_" lab of
+					true => resultSet
+					| false => Splayset.add(resultSet, n+1)
 		end
 
 	(* fromNumToNode : int Splayset.set -> node Splayset.set -> node Splayset.set *)
