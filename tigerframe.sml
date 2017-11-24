@@ -137,7 +137,7 @@ struct
 	fun string(l, s) : string =
 		let
 			val len = ".quad "^Int.toString(stringLen s)
-			val str = ".string \""^s^"\""
+			val str = ".string \""^tigertemp.makeString(s)^"\""
 		in
 			String.concat [
 				l^":"^"\n",
@@ -269,6 +269,7 @@ struct
 	fun procEntryExit2 (frame, body) = 
 		let
 			val exitLab = "EXIT_LAB"
+			val uniqueExitLab = exitLab^"_"^tigertemp.newlabel()
 		in
 			body
 			@ [tigerassem.OPER{
@@ -278,8 +279,8 @@ struct
 				jump=NONE
 			}]
 			@ [tigerassem.LABEL{
-				assem=exitLab^":\n",
-				lab=exitLab
+				assem=uniqueExitLab^":\n",
+				lab=uniqueExitLab
 			}]
 		end
 
