@@ -951,7 +951,9 @@ struct
 	       			spillWorklistInv())
 	       		end
 
-	       	(* deleteMoves : tigerassem.instr -> tigerassem.instr *)
+	       	(* Deletes tigerassem.MOVE's with same src and dst parameters from 
+	       	list of tigerassem.instr *)
+	       	(* deleteMoves : tigerassem.instr list -> tigerassem.instr list *)
 	       	fun deleteMoves [] = []
 	       		| deleteMoves ((move as tigerassem.MOVE {src, dst, ...}) :: moves) =
 	       			let
@@ -966,7 +968,7 @@ struct
 			       		val dst' = case Splaymap.peek(!color, dst) of
 	       					SOME tmp => tmp
 	       					| NONE => let
-			       						val _ = print("\nsrc = "^dst^"\n")
+			       						val _ = print("\ndst = "^dst^"\n")
 			       					in
 			       						raise Fail "Error - regAlloc. deleteMoves(): dst not in color dict"
 			       					end
@@ -977,7 +979,7 @@ struct
 	       				else 
 	       					move :: (deleteMoves moves)
 	       			end
-	       		| deleteMoves (_ :: l) = deleteMoves l 
+	       		| deleteMoves (instr :: l) = instr :: (deleteMoves l) 
 
 		in
 			(livenessAnalysis();
