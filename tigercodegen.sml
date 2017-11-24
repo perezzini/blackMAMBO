@@ -173,7 +173,7 @@ struct
 							| _ => raise Fail "Error - munchStm(): operación de comparación no soportada"
 
 						val _ = emit(OPER{
-								assem="cmpq `s0 `s1\n",
+								assem="cmpq `s0, `s1\n",
 								src=[munchExp e1, munchExp e2],
 								dst=[],
 								jump=NONE
@@ -311,25 +311,7 @@ struct
 			(* Generates aassembly code to evaluate the input tree expression, then 
 				returns register with final result in it *)
 			(* munchExp : tigertree.stm -> tigertemp.temp *)
-			and munchExp(MEM(BINOP(PLUS, e, CONST i))) =
-					generateTmp(fn r => 
-						emit(OPER{
-								assem="addq "^utils.intToString i^"(`s0)\n",
-								src=[munchExp e],
-								dst=[r],
-								jump=NONE
-							}))	
-
-				| munchExp(MEM(BINOP(PLUS, CONST i, e))) =
-					generateTmp(fn r => 
-						emit(OPER{
-								assem="addq "^utils.intToString i^"(`s0)\n",
-								src=[munchExp e],
-								dst=[r],
-								jump=NONE
-							}))
-
-				| munchExp(MEM(e)) =
+			and munchExp(MEM(e)) =
 					generateTmp(fn r => 
 						munchStm(MOVE(TEMP r, MEM e)))
 
@@ -548,21 +530,14 @@ struct
 				(* MUL op cases *)
 
 				| munchExp(BINOP(MUL, e1, e2)) =
-					let
-						val tmpe2 = munchExp e2
-						val tmpe1 = tigertemp.newtemp()
-					in
-						generateTmp(fn r => 
-							(munchStm(MOVE(TEMP tmpe1, e1));
-							emit(OPER{
-									assem="imulq `s0 `s1\n",
-									src=[tmpe1,
-										tmpe2],
-									dst=[tmpe1],
-									jump=NONE
-								});
-							munchStm(MOVE(TEMP r, TEMP tmpe1))))
-					end
+					generateTmp(fn r => 
+						(munchStm(MOVE(TEMP r, e1));
+						emit(OPER{
+								assem="imulq `s0, `d0\n",
+								src=[munchExp e2, r],
+								dst=[r],
+								jump=NONE
+							})))
 
 				| munchExp(BINOP(_,_,_)) = raise Fail "Error - munchExp(): operación binaria no soportada"
 
