@@ -582,8 +582,9 @@ struct
 														addWorkList v) 
 													else 
 														if (Splayset.member(precolored, u) andalso condCoalesce(u, v))
-															orelse not(Splayset.member(precolored, u)
-																andalso conservative(Splayset.union(adjacent u, adjacent v))) 
+															orelse 
+															(not(Splayset.member(precolored, u))
+																	andalso conservative(Splayset.union(adjacent u, adjacent v))) 
 														then 
 															(coalescedMoves := Splayset.union(!coalescedMoves, singleton_m);
 															combine(u, v);
