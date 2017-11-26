@@ -40,34 +40,47 @@ struct
 			MOVE(MEM(e1), e2): Evaluate e1, yielding address a. Then evaluate 
 			e2, and store the result into wordSize bytes of memory starting at 
 			a *)
-			fun munchStm(MOVE(MEM(BINOP(PLUS, e1, CONST i)), e2)) = 
-					emit(OPER{
-							assem="movq `s0, "^utils.intToString i^"(`s1)\n",
-							src=[munchExp e2, munchExp e1],
-							dst=[],
-							jump=NONE
-						})
+			fun munchStm(MOVE(MEM(BINOP(PLUS, CONST i, e)), NAME l)) =
+				emit(OPER{
+						assem="movq $"^l^", "^utils.intToString i^"(`s0)\n",
+						src=[munchExp e],
+						dst=[],
+						jump=NONE
+					})
 
-				| munchStm(MOVE(MEM(BINOP(PLUS, CONST i, e1)), e2)) =
+				| munchStm(MOVE(MEM(BINOP(PLUS, CONST i, e)), CONST j)) =
 					emit(OPER{
-							assem="movq `s0, "^utils.intToString i^"(`s1)\n",
-							src=[munchExp e2, munchExp e1],
-							dst=[],
-							jump=NONE
-						})
-
-				| munchStm(MOVE(MEM(CONST i), e)) =
-					emit(OPER{
-							assem="movq `s0, ("^utils.intToString i^")\n",
+							assem="movq $"^utils.intToString j^", "^utils.intToString i^"(`s0)\n",
 							src=[munchExp e],
 							dst=[],
 							jump=NONE
 						})
 
-				| munchStm(MOVE(MEM e1, e2)) =
+				| munchStm(MOVE(MEM(BINOP(PLUS, CONST i, e)), e')) =
+					emit(OPER{
+							assem="movq `s0, "^utils.intToString i^"(`s1)\n",
+							src=[munchExp e',
+								munchExp e],
+							dst=[],
+							jump=NONE
+						})
+
+				| munchStm(MOVE(MEM(BINOP(PLUS, e, CONST i)), e')) =
+					munchStm(MOVE(MEM(BINOP(PLUS, CONST i, e)), e'))
+
+				| munchStm(MOVE(MEM e, CONST i)) =
+					emit(OPER{
+							assem="movq $"^utils.intToString i^", (`s0)\n",
+							src=[munchExp e],
+							dst=[],
+							jump=NONE
+						})
+
+				| munchStm(MOVE(MEM e1, e2)) = 
 					emit(OPER{
 							assem="movq `s0, (`s1)\n",
-							src=[munchExp e2, munchExp e1],
+							src=[munchExp e2,
+								munchExp e1],
 							dst=[],
 							jump=NONE
 						})
@@ -198,7 +211,7 @@ struct
 				*)
 				| munchStm(EXP(CALL(NAME f, args))) =
 					let
-						val diff = length args - length (tigerframe.argregs)
+						val diff = List.length args - List.length (tigerframe.argregs)						
 					in
 						(emit(OPER{
 								assem="call "^f^"\n",
@@ -249,10 +262,15 @@ struct
 						end
 
 
+			(* munchArgs() generates code to move all the arguments to their correct positions, 
+			in outgoing parameter registers and/or in memory. Returns a list of all the temporaries 
+			that are to be passed to the machine's CALL instruction; they should be listed as 
+			"sources" of the instruction, so that liveness analysis can see that their values need 
+			to be kept up to the point of call. *)
 			and munchArgs args =
 						let
-							fun munchArgsStack [] = []								(* Place parameters in memory *)
-								| munchArgsStack (a::ass) = 
+							fun argsToStack [] = []													(* Push parameters in stack *)
+								| argsToStack (a::ass) = 
 									let 
 										val _ = case a of
 											CONST i => emit(OPER{
@@ -291,21 +309,26 @@ struct
 													dst=[],
 													jump=NONE
 												})
-											| _ => raise Fail "Error - munchArgsStack()"
+											| _ => emit(OPER{
+													assem="pushq `s0\n",
+													src=[munchExp a],
+													dst=[],
+													jump=NONE
+												})
 									in
-										munchArgsStack ass
+										argsToStack ass
 									end
 
-							fun munchArgsReg [] _ = []
-								| munchArgsReg ass [] = munchArgsStack (rev ass)	(* Runned out of registers to allocate arguments, so store them in memory applying C calling convention *)
-								| munchArgsReg (a::ass) (r::rss) = 
+							fun argsToReg [] _ = []
+								| argsToReg ass [] = argsToStack (rev ass)			(* Runned out of machine's temporaries argument registers to move function's arguments, so push them in stack applying C calling convention *)
+								| argsToReg (a::ass) (r::rss) = 
 									let
-										val _ = munchStm(MOVE(TEMP r, a))			(* Move argument to register *)
+										val _ = munchStm(MOVE(TEMP r, a))			(* Move argument to temporary register *)
 									in
-										r::(munchArgsReg ass rss)					(* Save list of registers *)
+										r::(argsToReg ass rss)						(* Save list of registers *)
 									end
 						in
-							munchArgsReg args tigerframe.argregs					(* Attempt to store function's arguments at machine available registers if possible *)
+							argsToReg args tigerframe.argregs						(* Attempt to move function's arguments to machine's temporaries argument registers available if possible *)
 						end
 
 			(* Generates aassembly code to evaluate the input tree expression, then 
