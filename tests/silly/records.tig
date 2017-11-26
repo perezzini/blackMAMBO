@@ -1,0 +1,7 @@
+let
+	type record = {id: int, str: string, str2: string}
+
+	var r:record := record{id = 2, str = "string", str2 = "string2"}
+in
+	0
+end
