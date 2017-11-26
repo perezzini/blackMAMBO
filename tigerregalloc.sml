@@ -204,6 +204,7 @@ struct
 	       									allocPairToString pair))^"\n")
 								end
 					| "kColors" => print("\n"^"kColors = "^(utils.setToString kColors utils.id)^"\n")
+					| "alias" => print("\n"^"alias = "^(utils.dictToString (!alias) utils.id utils.id)^"\n")
 	       			| _ => raise Fail "Error - regAlloc. printDataStructure(): data structured not considered"
 	       	
 	       	(* printAllDataStructures : unit -> unit *)
@@ -229,6 +230,7 @@ struct
 	       		printDataStructure "moveList";
 	       		printDataStructure "color";
 	       		printDataStructure "kColors";
+	       		printDataStructure "alias";
 	       		print("\n====================\t End all data structures \t====================\n"))
 
 			(* livenessAnalysis : unit -> unit *)
