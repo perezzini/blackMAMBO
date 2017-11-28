@@ -137,10 +137,12 @@ struct
 
 
 			(* computationByIteration : node list -> bool -> unit *)
-			fun computationByIteration (((node as (instr, n)) :: nodes) : node list) flag =
+			fun computationByIteration [] false = computationByIteration nodesList true
+				| computationByIteration [] true = ()
+				| computationByIteration (((node as (instr, n)) :: nodes) : node list) flag =
 					let
 						(* insertSetFromArray : node -> tigertemp.temp Splayset.set *)
-						fun insertSetFromArray (_, n) = Array.sub (liveInArray, n)
+						fun insertLiveInSetFromArray (_, n) = Array.sub (liveInArray, n)
 
 						val emptySet = Splayset.empty(String.compare)
 
@@ -148,33 +150,30 @@ struct
 																Array.sub (liveOutArray, n))
 
 						(* succNodes : node Splayset.set. Set of successors nodes of input node *)
-						val succNodes = fromNumToNode (successors node iGraph) iGraph
+						val succNodes : node Splayset.set = fromNumToNode (successors node iGraph) iGraph
 
-						val succNodesToList = Splayset.listItems(succNodes)
+						val succNodesToList : node list = Splayset.listItems(succNodes)
 
 						(* succNodes' : tigertemp.temp Splayset.set list *)
-						val succNodes' = List.map insertSetFromArray succNodesToList
+						val succNodes' : tigertemp.temp Splayset.set list  = List.map insertLiveInSetFromArray succNodesToList
 
 
-						(* Begin iteration... *)
+						(* Begin iteration... 
+						Update first out[n] and then in[n] *)
 
-						val _ = Array.update (liveOutArray, n, List.foldl Splayset.union emptySet succNodes')
+						val genUnionSet : tigertemp.temp Splayset.set = List.foldl Splayset.union emptySet succNodes'
+						val _ = Array.update (liveOutArray, n, genUnionSet)
 
 						val diff = Splayset.difference(Array.sub (liveOutArray, n), calculateDefSet instr)
 						val union = Splayset.union(calculateUseSet instr, diff)
-
 						val _ = Array.update(liveInArray, n, union)
 
 						val flag' = (Splayset.equal (Array.sub (liveInArray, n), liveInArrayAux))
 									andalso
 									(Splayset.equal (Array.sub (liveOutArray, n), liveOutArrayAux))
-									andalso
-									flag
 					in
-						computationByIteration nodes flag'
+						computationByIteration nodes (flag andalso flag')
 					end
-				| computationByIteration [] false = computationByIteration nodesList true
-				| computationByIteration [] true = ()
 
 			(* Compute liveness *)
 			val _ = computationByIteration nodesList true
@@ -203,8 +202,7 @@ struct
 					val liveOutStr : string = utils.setToString liveOutSet (fn x => x)
 
 					(* Just deletes last \n char *)
-					val instrStr' : string = String.substring(instrStr, 0, (String.size instrStr) - 1)
-						handle Subscript => raise Fail "Error - liveness. liveOutInfoToString()"
+					val instrStr' : string = utils.deleteEnterFromString instrStr
 				in
 					(instrStr',
 					nStr,
