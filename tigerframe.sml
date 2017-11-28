@@ -216,24 +216,22 @@ struct
 			If function returns a value, "body" is a statement that moves the 
 			indicated value to RV register *)
 
-			(* DEBUGGING *)
-			(*val _  = print("\n**DEBUGGING from tigerframe.procEntryExit1():\nformals list of "^name f^" = "^listToString (!formals) (fn x => x)^"\n")*)
-
 			val fmlsLength = List.length (!formals)
-			val fmlsRegisters = if fmlsLength > argregsNum 
-									then 
-										List.take(!formals, argregsNum) 
-									else 
-										!formals
-			val regPairs = ListPair.zip (fmlsRegisters, argregs)
+			val fmlsRegisters : access list = if fmlsLength >= argregsNum + 1 
+												then 
+													List.take(!formals, argregsNum) 
+												else 
+													!formals
+			val regPairs : (access * tigertemp.temp) list = ListPair.zip (fmlsRegisters, argregs)
 
 			(* For each incoming register parameter, move it to the place from which it's 
 			seen from within the function - page 261 *)
-			val parametersMoves = map (fn (access, argreg) => 
+			val parametersMoves : tigertree.stm list = List.map (fn (access, argreg) => 
 				case access of
 					InReg r => MOVE(TEMP r, TEMP argreg)
 					| InFrame offset => MOVE(exp (InFrame offset) (TEMP fp), TEMP argreg)) regPairs	
-			val parametersMoves' = 
+
+			val parametersMoves' : tigertree.stm list = 
 				let
 					fun calculateNewOffset offset = offset*wSz + 2*wSz
 
@@ -243,7 +241,7 @@ struct
 					val accOff' = List.map (fn (access, offset) => 
 						(access, calculateNewOffset offset)) accOff
 				in
-					map (fn (access, offset) => 
+					List.map (fn (access, offset) => 
 					case access of
 						InReg r => MOVE(TEMP r, exp (InFrame offset) (TEMP fp))
 						| InFrame offset' => MOVE(exp (InFrame offset') (TEMP fp), exp (InFrame offset) (TEMP fp))) accOff'
@@ -251,11 +249,30 @@ struct
 				handle Subscript => []
 
 			(* Store instructions for saving and restoring callee-saves *)
-			val (saveCalleesavesMoves, restoreCalleesavesMoves) = foldl
+			val (saveCalleesavesMoves : tigertree.stm list , restoreCalleesavesMoves : tigertree.stm list) = List.foldl
 		          (fn (t, (a, b)) => let val fresh = tigertemp.newtemp()
 		                              in (MOVE (TEMP fresh, TEMP t) :: a,
 		                                  MOVE (TEMP t, TEMP fresh) :: b) end)
 		          ([], []) calleesaves
+
+		    fun debug() =
+		    	let
+		    		val regPairs' : string list = List.map (fn pair => 
+													utils.pairToString pair accessToString utils.id) regPairs
+		    	in
+		    		print("\n*********************\n");
+					print("\nDEBUGGING FROM tigerframe.procEntryExit1(). Function name = "^name f^"\n");
+					print("\n\tformals length = "^Int.toString fmlsLength^"\n");
+					print("\n\tfmlsRegisters = "^(utils.listToString fmlsRegisters accessToString)^"\n");
+					print("\n\tregPairs = "^(utils.listToString regPairs' utils.id)^"\n");
+					print("\n\tparameterMoves = "^(utils.listToString parametersMoves tigerit.tree)^"\n");
+					print("\n\tparameterMoves' = "^(utils.listToString parametersMoves' tigerit.tree)^"\n");
+					print("\n\tsaveCalleesavesMoves = "^(utils.listToString saveCalleesavesMoves tigerit.tree)^"\n");
+					print("\n\trestoreCalleesavesMoves = "^(utils.listToString restoreCalleesavesMoves tigerit.tree)^"\n");
+					print("\n*********************\n")
+		    	end
+
+		    (*val _ = debug()*)
 
 		in
 			seq(parametersMoves
