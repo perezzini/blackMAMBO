@@ -21,4 +21,7 @@ sig
 
 	(* Converts a Splaymap dict to string *)
 	val dictToString : ('a, 'b) Splaymap.dict -> ('a -> string) -> ('b -> string) -> string
+
+	(* Deletes last enter from a string *)
+	val deleteEnterFromString : string -> string
 end

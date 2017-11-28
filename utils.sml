@@ -63,4 +63,8 @@ struct
 				pairToString pair aToString bToString)
 		end
 
+	fun deleteEnterFromString str =
+		String.substring(str, 0, (String.size str) - 1)
+			handle Subscript => raise Fail "Error - deleteEnterFromString()"
+
 end
