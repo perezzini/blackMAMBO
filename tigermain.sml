@@ -17,7 +17,7 @@ fun main(args) =
 		(* OPTIONS *)
 		val (arbol, l1)		= arg(args, "-arbol")
 		val (escapes, l2)	= arg(l1, "-escapes") 
-		val (ir, l3)		  = arg(l2, "-ir") 
+		val (ir, l3)		= arg(l2, "-ir") 
 		val (canon, l4)		= arg(l3, "-canon") 
 		val (code, l5)		= arg(l4, "-code") 
 		val (flow, l6)		= arg(l5, "-flow") 
@@ -25,7 +25,7 @@ fun main(args) =
 		val (debug, l8)		= arg(l7, "-debug")
 		val (liveout, l9)	= arg(l8, "-liveout")
 		val (color, l10)  	= arg(l9, "-color")
-		val (assem, l11) 	= arg(l10, "-assem")
+		val (assembly, l11) = arg(l10, "-assembly")
 
 		val (entrada, fileName) =
 			case l11 of 	(* Remember to change this value in case of new options *)
@@ -71,7 +71,7 @@ fun main(args) =
 		strings : tigerframe.frag list - STRING *)
 		val (procs, strings) : ({body : tigertree.stm, frame : tigerframe.frame} list * (tigertemp.label * string) list) = fragPartition fragments ([], [])
 
-		val procsCanonized : (tigertree.stm list * tigerframe.frame) list = List.map (fn {body, frame} => 
+		val canonProcs : (tigertree.stm list * tigerframe.frame) list = List.map (fn {body, frame} => 
 			(canonize body, frame)) procs
 
 		(* -canon OPTION *)
@@ -79,18 +79,18 @@ fun main(args) =
 				then 
 					List.app (fn (c, f) => 
 						(print("\n"^tigerframe.name(f)^":\n");
-						 List.app (print o tigerit.tree) c)) procsCanonized	(* c : tigertree.stm list *)
+						 List.app (print o tigerit.tree) c)) canonProcs	(* c : tigertree.stm list *)
 				else 
 					()
 
 		(* -inter OPTION *)
 		val _ = if inter 
 				then 
-					tigerinterp.inter debug procsCanonized strings 
+					tigerinterp.inter debug canonProcs strings 
 				else 
 					()
 
-		val procsToAssem : (tigerassem.instr list * tigerframe.frame) list = List.map (fn (cbody, frame) => 
+		val assem : (tigerassem.instr list * tigerframe.frame) list = List.map (fn (cbody, frame) => 
 			let
 				val instrList = List.concat (List.map (tigercodegen.codegen frame) cbody)	(* cbody is a tigertree.stm list;
 																							tigercodegen.codegen returns a instr list. Then, we have to flat a list of lists *)
@@ -98,49 +98,54 @@ fun main(args) =
 				val instrList' = tigerframe.procEntryExit2(frame, instrList)				(* Apply tigerframe.procEntryExit2() *)
 			in
 				(instrList', frame)
-			end) procsCanonized
+			end) canonProcs
 
 		(* Format, using tigertemp.makeString, each instruction converted to assembly language *)
-		val assemBodyFormatted : (tigertemp.label * string list) list = List.map (fn (ilist, frame) => 
+		val assemString : (tigertemp.label * string list) list = List.map (fn (ilist, frame) => 
 			(tigerframe.name frame, 
-				List.map (tigerassem.format tigertemp.makeString) ilist)) procsToAssem	(* Since I have not done register assignment yet, I just pass 
-																															tigertemp.makeString to format as the translation function from 
-																															temporaries to strings *)
+				List.map (tigerassem.format tigertemp.makeString) ilist)) assem	(* Since I have not done register assignment yet, I just pass 
+																				tigertemp.makeString to format as the translation function from 
+																				temporaries to strings *)
 		(* -code OPTION *)
 		val _ = if code 
 				then 
 					List.app (fn (fName, instrStrList) => 
 						(print("\n"^fName^":\n\n");
-							List.app print instrStrList)) assemBodyFormatted
+							List.app print instrStrList)) assemString
 				else 
 					()
 
 
 		(* LIVENESS ANALYSIS *)
 
-		val liveOutInfo : (string * (string * string * string * string) list) list  = List.map (fn (instrList, frame) => 
+		fun prepareLiveOutInfo() =
 			let
-				val info = tigerliveness.liveOutInfoToString instrList
-				val fName = tigerframe.name frame
+				val liveOutInfo : (string * (string * string * string * string) list) list  = List.map (fn (instrList, frame) => 
+																								let
+																									val info = tigerliveness.liveOutInfoToString instrList
+																									val fName = tigerframe.name frame
+																								in
+																									(fName, info)
+																								end) assem
+				(* Concat live-out info in one string *)
+				val liveOutInfo' : (string * string list) list = List.map (fn (fName, liveOutInfoToStringList) => 
+					(fName, List.map (fn (instrStr, nStr, succSetStr, liveOutStr) => 
+						let
+							val concatValues = "("^instrStr^";\tnode = "^nStr^";\tsuccs = "^succSetStr^";\tlive-out = "^liveOutStr^")\n"
+						in
+							concatValues
+						end) liveOutInfoToStringList)) liveOutInfo
 			in
-				(fName, info)
-			end) procsToAssem
+				liveOutInfo'
+			end
 
-		(* Concat live-out info in one string *)
-		val liveOutInfo' : (string * string list) list = List.map (fn (fName, liveOutInfoToStringList) => 
-			(fName, List.map (fn (instrStr, nStr, succSetStr, liveOutStr) => 
-				let
-					val concatValues = "("^instrStr^";\tnode = "^nStr^";\tsuccs = "^succSetStr^";\tlive-out = "^liveOutStr^")\n"
-				in
-					concatValues
-				end) liveOutInfoToStringList)) liveOutInfo
 
 		(* -liveout OPTION *)
 		val _ = if liveout 
 				then 
 					List.app (fn (fName, liveOutInfoToStringList) => 
 						(print("\n"^fName^":\t(instr list length = "^Int.toString (List.length liveOutInfoToStringList)^")\n\n");
-						List.app print liveOutInfoToStringList)) liveOutInfo'
+						List.app print liveOutInfoToStringList)) (prepareLiveOutInfo())
 				else 
 					()
 
@@ -179,14 +184,12 @@ fun main(args) =
 			replace
 		  end
 
-		val procsColored : (string list * tigerframe.frame) list = computeRegisterAllocation procsToAssem
-
 		(* -color OPTION *)
 		val _ = if color 
 				then 
 				  List.app (fn (instrListStr, frame) => 
-					(print("\n"^tigerframe.name frame^":\n\n");
-					  List.app print instrListStr)) procsColored
+					(print("\n"^tigerframe.name frame^"(instruction list length = "^Int.toString (List.length instrListStr)^"):\n\n");
+					  List.app print instrListStr)) (computeRegisterAllocation assem)
 				else 
 				  ()
 
@@ -243,10 +246,10 @@ fun main(args) =
 			]
 		  end
 
-		val finalOutputAssembly : string = createFinalOutputAssembly procsColored strings
+		val finalOutputAssembly : string = createFinalOutputAssembly (computeRegisterAllocation assem) strings
 
 		(* -assem OPTION *)
-		val _ = if assem 
+		val _ = if assembly 
 				then 
 					print("\n**********\tFINAL OUTPUT ASSEMBLY\t**********\n\n"^finalOutputAssembly^"\n") 
 				else 
