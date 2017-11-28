@@ -318,47 +318,34 @@ struct
 			fun build() =
 				Splayset.app (fn node => 
 					let
-						val instr = tigerliveness.getInstrFromNode node
-						val instrNum = tigerliveness.getNumFromNode node
+						val (instr, nodeNum) = (tigerliveness.getInstrFromNode node, tigerliveness.getNumFromNode node)
+						(*val live = ref (List.nth(!liveOutTable, nodeNum))*)
 					in
-						(if tigerassem.isMoveInstruction instr 
+						if tigerassem.isMoveInstruction instr 
 						then 
-							(let
-								val moveInstr = tigerassem.getSrcDstFromMoveInstruction instr
-								val moveInstrNode = (#src moveInstr, #dst moveInstr)
+							((*live := Splayset.difference(!live, tigerliveness.calculateUseSet instr);*)
+							Splayset.app (fn n => 
+								let
+									val moveList_n = case Splaymap.peek(!moveList, n) of
+										SOME set => set
+										| NONE => raise Fail "Error - regAlloc. build(): peek error"
 
-								val defSet = tigerliveness.calculateDefSet instr
-								val useSet = tigerliveness.calculateUseSet instr
-								val defUseUnion = Splayset.union(defSet, useSet)
-							in
-								Splayset.app (fn n => 
-									let
-										val moveListN = case Splaymap.peek(!moveList, n) of
-											SOME set => set
-											| NONE => raise Fail "Error - regAlloc. build() peek error"
-
-										val singletonInstr = Splayset.singleton cmpPairs moveInstrNode
-									in
-										moveList := Splaymap.insert(!moveList, n, Splayset.union(moveListN, singletonInstr))
-									end) defUseUnion
-							end;
+									val moveSrcDst = tigerassem.getSrcDstFromMoveInstruction instr
+								in
+									moveList := Splaymap.insert(!moveList, n, Splayset.add(moveList_n, (#src moveSrcDst, #dst moveSrcDst)))
+								end) (Splayset.union(tigerliveness.calculateDefSet instr, tigerliveness.calculateUseSet instr));
 							let
-								val moveInstr = tigerassem.getSrcDstFromMoveInstruction instr
-								val moveInstrNode = (#src moveInstr, #dst moveInstr)
-
-								val singletonInstr = Splayset.singleton cmpPairs moveInstrNode
+								val moveSrcDst = tigerassem.getSrcDstFromMoveInstruction instr
 							in
-								worklistMoves := Splayset.union(!worklistMoves, singletonInstr)
+								worklistMoves := Splayset.add(!worklistMoves, (#src moveSrcDst, #dst moveSrcDst))
 							end)
 						else 
 							();
+						(*live := Splayset.union(!live, tigerliveness.calculateDefSet instr);*)
 						Splayset.app (fn d => 
-							let
-								val liveOutSetInstr = List.nth(!liveOutTable, instrNum)
-							in
-								Splayset.app (fn l => 
-									addEdge(l, d)) liveOutSetInstr
-							end) (tigerliveness.calculateDefSet instr))
+							Splayset.app (fn l => 
+								addEdge(l, d)) (List.nth(!liveOutTable, nodeNum))) (tigerliveness.calculateDefSet instr)
+						(*live := Splayset.union(tigerliveness.calculateUseSet instr, Splayset.difference(!live, tigerliveness.calculateDefSet instr))*)
 					end) (!iGraph)
 
 			(* nodeMoves : tigertemp.temp -> move Splayset.set *)
@@ -729,11 +716,18 @@ struct
 	            in 
 	            	(whileStackNotEmpty();
             		Splayset.app (fn n =>
-                        let val color_alias_n = case Splaymap.peek(!color, getAlias n) of
+                        let
+                        	(* This value always has to exist? *)
+                        	val color_alias_n = case Splaymap.peek(!color, getAlias n) of
                                 SOME c => c
-                                | _ => "" (* is this ok? *)
+                                | NONE => let
+		                                	val _ = print("\ngetAlias "^n^" = "^getAlias n^"\n")
+		                                in
+		                                	raise Fail "Error - regAlloc. assignColors(): color[getAlias n] no existe"
+		                                end
                             val _ = (color := Splaymap.insert(!color, n, color_alias_n))
-                        in ()
+                        in 
+                        	()
                         end) (!coalescedNodes))
             	end
 
@@ -766,7 +760,7 @@ struct
 	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newStore() peek error"
 	       				in
 	       					tigerassem.OPER {
-	       						assem = "movq `s0, "^utils.intToString oldTmpOffset^"(`s1) # SPILLED - STORE\n",
+	       						assem = "movq `s0, "^utils.intToString oldTmpOffset^"(`s1) #\tSPILLED - STORE\n",
 	       						src = [newTmp,
 	       							tigerframe.fp],
 	       						dst = [],
@@ -782,7 +776,7 @@ struct
 	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newLoad() peek error"
 	       				in
 	       					tigerassem.OPER {
-	       						assem = "movq "^utils.intToString oldTmpOffset^"(`s0), `d0 # SPILLED - LOAD\n",
+	       						assem = "movq "^utils.intToString oldTmpOffset^"(`s0), `d0 #\tSPILLED - LOAD\n",
 	       						src = [tigerframe.fp],
 	       						dst = [newTmp],
 	       						jump = NONE
@@ -985,7 +979,7 @@ struct
 	       		| deleteMoves (instr :: l) = instr :: (deleteMoves l) 
 
 		in
-			(livenessAnalysis();
+			livenessAnalysis();
 			print("\n**liveAnalysis() DONE\n");
 			build();
 			print("\n**build() DONE\n");
@@ -999,18 +993,14 @@ struct
 			if not(Splayset.isEmpty (!spilledNodes))
 			then 
 				let
-					val newInstrList = rewriteProgram();
-					val _ = print("\n**rewriteProgram() DONE\n");
-
+					val _ = print("\n**rewriteProgram() DONE\n")
+				in
 					(* perform algorithm all over again with new 
 						altered graph *)
-					val (alloc, instrList') = regAlloc(newInstrList, frame)
-				in
-					(alloc, deleteMoves instrList')
+					regAlloc(rewriteProgram(), frame)
 				end
 			else 
 				(!color, deleteMoves instrList)
-			)	
 		end
 
 end
