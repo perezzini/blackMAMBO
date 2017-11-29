@@ -14,15 +14,12 @@ struct
 
 	val emptyNodeSet : tigertemp.temp Splayset.set = Splayset.empty String.compare
 
-	(* cmpPairs : (tigertemp.temp * tigertemp.temp) * (tigertemp.temp * tigertemp.temp) -> order *)
-	fun cmpPairs ((s1, d1), (s2, d2)) = 
-		if s1 = s2 then String.compare(d1, d2) else String.compare(s1, s2)
+	(* cmpPairs : move * move -> order *)
+	fun cmpPairs ((s1, d1) : move, (s2, d2) : move) = case String.compare(s1, s2) of
+		EQUAL => String.compare(d1, d2)
+		| x => x
 
-	(* allocPairToString : (tigertemp.temp * tigerframe.register) -> string *)
-	fun allocPairToString pair = 
-		utils.pairToString pair utils.id utils.id
-
-	val emptyMoveSet : (tigertemp.temp * tigertemp.temp) Splayset.set = Splayset.empty cmpPairs
+	val emptyMoveSet : move Splayset.set = Splayset.empty cmpPairs
 
 	(* All general-purpose target-machine registers *)
 	val precolored : tigertemp.temp Splayset.set = Splayset.addList(emptyNodeSet, tigerframe.registers)
@@ -153,6 +150,11 @@ struct
 					()
 				end
 
+			(* getLiveOutSetFromInstrNum : int -> tigertemp.temp Splayset.set *)
+			fun getLiveOutSetFromInstrNum (nodeNum : int) : tigertemp.temp Splayset.set =
+				List.nth(!liveOutTable, nodeNum)
+					handle Subscript => raise Fail "Error - regAlloc. getLiveOutSetFromInstrNum(): Subscript error"
+
 			(* printDataStructure : string -> unit *)
 	       	fun printDataStructure ds =
 	       		case ds of
@@ -192,7 +194,8 @@ struct
 					| "moveList" => let
 										val moveList' : (tigertemp.temp * move Splayset.set) list = Splaymap.listItems (!moveList)
 										val moveList'' : (tigertemp.temp * string) list = List.map (fn (tmp, moveSet) => 
-											(tmp, utils.setToString moveSet allocPairToString)) moveList'
+											(tmp, utils.setToString moveSet (fn pair => 
+												utils.pairToString pair utils.id utils.id))) moveList'
 									in
 										print("\n"^"moveList = "^(utils.listToString moveList'' (fn pair => 
 	       									utils.pairToString pair utils.id utils.id))^"\n")
@@ -201,7 +204,7 @@ struct
 									val color' = Splaymap.listItems (!color)
 								in
 									print("\n"^"color = "^(utils.listToString color' (fn pair => 
-	       									allocPairToString pair))^"\n")
+	       									utils.pairToString pair utils.id utils.id))^"\n")
 								end
 					| "kColors" => print("\n"^"kColors = "^(utils.setToString kColors utils.id)^"\n")
 					| "alias" => print("\n"^"alias = "^(utils.dictToString (!alias) utils.id utils.id)^"\n")
@@ -344,7 +347,7 @@ struct
 						(*live := Splayset.union(!live, tigerliveness.calculateDefSet instr);*)
 						Splayset.app (fn d => 
 							Splayset.app (fn l => 
-								addEdge(l, d)) (List.nth(!liveOutTable, nodeNum))) (tigerliveness.calculateDefSet instr)
+								addEdge(l, d)) (getLiveOutSetFromInstrNum nodeNum)) (tigerliveness.calculateDefSet instr)
 						(*live := Splayset.union(tigerliveness.calculateUseSet instr, Splayset.difference(!live, tigerliveness.calculateDefSet instr))*)
 					end) (!iGraph)
 
@@ -449,9 +452,6 @@ struct
 					degree_t < k orelse Splayset.member(precolored, t) orelse Splayset.member(!adjSet, (t, r))
 				end
 
-			fun condCoalesce(u, v) = 
-				Splayset.foldl (fn (t, b) => b andalso ok(t, u)) true (adjacent v)
-
 			(* addWorkList : tigertemp.temp -> unit *)
 			fun addWorkList u = 
 				let
@@ -549,15 +549,19 @@ struct
 												val x = getAlias x'
 												val y = getAlias y'
 
-												val (u, v) = if Splayset.member(precolored, y) 
-												then 
-													(y, x) 
-												else 
-													(x, y)
+												val (u, v) = 
+													if Splayset.member(precolored, y) 
+													then 
+														(y, x) 
+													else 
+														(x, y)
 
 												val singleton_m = Splayset.singleton cmpPairs m
 
 												val _ = worklistMoves := Splayset.difference(!worklistMoves, singleton_m)
+
+												fun cond(u, v) : bool = 
+													Splayset.foldl (fn (t, b) => b andalso ok(t, u)) true (adjacent v)
 											in
 												if u = v 
 												then 
@@ -570,7 +574,7 @@ struct
 														addWorkList u;
 														addWorkList v) 
 													else 
-														if (Splayset.member(precolored, u) andalso condCoalesce(u, v))
+														if (Splayset.member(precolored, u) andalso cond(u, v))
 															orelse 
 															(not(Splayset.member(precolored, u))
 																	andalso conservative(Splayset.union(adjacent u, adjacent v))) 
@@ -675,6 +679,7 @@ struct
 	                        let 
 	                        	val n = popStack()
 								val okColors = ref kColors
+
 								val _ = case Splaymap.peek(!adjList, n) of
 									NONE => ()
 									| SOME adjList_n =>
@@ -685,36 +690,38 @@ struct
 									            let 
 									            	val alias_w = getAlias w
 									            in
-									             if Splayset.member(union, alias_w)
-									             then 
-									             	let 
-									             		val color_alias_w = Splaymap.find(!color, alias_w)
-								                  	in
-									                   okColors := Splayset.difference(!okColors, Splayset.singleton String.compare color_alias_w)
-								                  	end
-									             else 
-									             	()
+													if Splayset.member(union, alias_w)
+													then 
+														let 
+															val color_alias_w = Splaymap.find(!color, alias_w)
+														in
+													   okColors := Splayset.difference(!okColors, Splayset.singleton String.compare color_alias_w)
+														end
+													else 
+														()
 									            end) adjList_n
 									    end
+
 								val _ = if Splayset.isEmpty(!okColors)
-										then spilledNodes := Splayset.add(!spilledNodes, n)
+										then 
+											spilledNodes := Splayset.add(!spilledNodes, n)
 										else 
-										let 
-											val _ = (coloredNodes := Splayset.add(!coloredNodes, n))
-										    val c = case Splayset.find (fn _ => true) (!okColors) of
-										        SOME c' => c'
-										        | _ => raise Fail "Error - regAlloc. assignColors(): okColors find error"
-										    val _ = (color := Splaymap.insert(!color, n, c))
-										in 
-											()
-										end
+											let 
+												val _ = coloredNodes := Splayset.add(!coloredNodes, n)
+											    val c = case Splayset.find (fn _ => true) (!okColors) of
+											        SOME c' => c'
+											        | _ => raise Fail "Error - regAlloc. assignColors(): okColors find error; no debería pasar"
+											    val _ = color := Splaymap.insert(!color, n, c)
+											in 
+												()
+											end
 	                         	in 
                          			whileStackNotEmpty()
                          		end
 	                    else 
 	                    	()
 	            in 
-	            	(whileStackNotEmpty();
+	            	whileStackNotEmpty();
             		Splayset.app (fn n =>
                         let
                         	(* This value always has to exist? *)
@@ -725,10 +732,9 @@ struct
 		                                in
 		                                	raise Fail "Error - regAlloc. assignColors(): color[getAlias n] no existe"
 		                                end
-                            val _ = (color := Splaymap.insert(!color, n, color_alias_n))
                         in 
-                        	()
-                        end) (!coalescedNodes))
+                        	color := Splaymap.insert(!color, n, color_alias_n)
+                        end) (!coalescedNodes)
             	end
 
 	       	(* rewriteProgram() allocates memory locations for the spilled nodes temporaries and 

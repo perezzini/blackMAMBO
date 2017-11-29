@@ -4,6 +4,4 @@ sig
 	type move
 
 	val regAlloc : (tigerassem.instr list * tigerframe.frame) -> allocation * tigerassem.instr list
-
-	val allocPairToString : (tigertemp.temp * tigerframe.register) -> string
 end
