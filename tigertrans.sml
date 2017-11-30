@@ -376,13 +376,6 @@ fun callExp (name, external, isproc, lev:level, ls) =
 			SOME f => tigerframe.name f
 			| _ => "NONE"
 
-		(* Debugging *)
-		(*
-		val _ = print("\n**DEBUGGING from tigertrans.callExp. Function name: "^name^"\n")
-		val _ = print("callee ("^name^") level = "^Int.toString(calleeLev)^"\n")
-		val _ = print("caller ("^callerName^") level = "^Int.toString(callerLev)^"\n")
-		*)
-
 		val fplev = if calleeLev = callerLev then 
 						MEM(BINOP(PLUS, TEMP tigerframe.fp, CONST tigerframe.fpPrevLev)) (* 1er CASO *)
 					else 
@@ -417,6 +410,10 @@ fun callExp (name, external, isproc, lev:level, ls) =
 		
 		(* external indica si es de run-time. En el caso que así lo sea, no se le pasa el static link *)
 		val ta' = if external then ta else fplev::ta
+
+		fun debug() = (print("\n**DEBUGGING from tigertrans.callExp. Function name: "^name^"\n");
+						print("callee ("^name^") level = "^Int.toString(calleeLev)^"\n");
+						print("caller ("^callerName^") level = "^Int.toString(callerLev)^"\n"))
 	in
 		if isproc then (* La función devuelve TUnit *)
 			Nx(seq(ls' @ [EXP(CALL(NAME name, ta'))]))
