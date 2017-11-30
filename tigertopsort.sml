@@ -130,16 +130,24 @@ fun agregarecs env [] = env
 | agregarecs env ((k, v)::t) = agregarecs (tabRInserta(k, v, env)) t
 
 fun fijaTipos batch env =
-	let	val pares = genPares batch
+	let	
+		val pares = genPares batch
 		val recs = buscaArrRecords batch
 		val orden = topsort pares
 		val env' = procesa orden batch env recs
 		val env'' = agregarecs env' recs
 		val env''' = fijaNONE (tabAList env'') env''
 
-		(* Debugging *)
-		val _ = print("\n**Debugging from tigertopsort\n")
-		val _ = (print "\n TENV table: \n"; tigermuestratipos.printTTipos(tabAList env'''))
+		fun debug() =
+			let
+			in
+				print("\n************ DEBUGGING FROM tigertopsort.fijaTipos()\n");
+				print("\nTENV table: \n");
+				tigermuestratipos.printTTipos(tabAList env''')
+
+			end
+
+		(*val _ = debug()*)
 	in	
 		env''' 
 	end
