@@ -211,24 +211,31 @@ struct
 				*)
 				| munchStm(EXP(CALL(NAME f, args))) =
 					let
-						val diff = List.length args - List.length (tigerframe.argregs)						
+						val diff = List.length args - List.length (tigerframe.argregs)
 					in
-						(emit(OPER{
+						(* preguntar si es _allocRecord *)
+						emit(OPER{
+								assem="movq $0, `d0 # added\n",
+								src=[],
+								dst=[tigerframe.rv],
+								jump=NONE
+							});
+						emit(OPER{
 								assem="call "^f^"\n",
-								src=munchArgs args,
+								src=(munchArgs args) @ [tigerframe.rv],
 								dst=tigerframe.calldefs,
 								jump=NONE
 							});
 						if diff > 0 
 						then 
 							emit(OPER{
-									assem="addq $"^utils.intToString(diff*(tigerframe.wSz))^", `s0\n",
-									src=[tigerframe.sp],
+									assem="addq $"^utils.intToString(diff*(tigerframe.wSz))^", %rsp # diff = "^Int.toString diff^"\n",
+									src=[],
 									dst=[],
 									jump=NONE
 								}) 
 						else 
-							())
+							()
 					end
 
 				| munchStm(EXP(CALL _)) = raise Fail "Error - munchStm(): CALL sin label"
