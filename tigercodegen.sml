@@ -186,7 +186,7 @@ struct
 							| _ => raise Fail "Error - munchStm(): operación de comparación no soportada"
 
 						val _ = emit(OPER{
-								assem="cmpq `s0, `s1\n",
+								assem="cmpq `s1, `s0\n",
 								src=[munchExp e1, munchExp e2],
 								dst=[],
 								jump=NONE
