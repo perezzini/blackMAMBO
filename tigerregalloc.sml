@@ -824,7 +824,7 @@ struct
 	       								val _ = newTemps := Splayset.add(!newTemps, newTmp)
 	       							in
 	       								(tmp, newTmp)
-	       							end) instrUsesSpilledList
+	       							end) instrDefsSpilledList
 
 	       						(* Perform store's and load's *)
 	       						val storesList : tigerassem.instr list = List.map (fn (oldTmp, newTmp) => 
