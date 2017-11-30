@@ -190,10 +190,11 @@ fun stringLen s =
 fun stringExp(s: string) =
     let 
     	fun format [] = []
-            | format (#"\\"::(#"x"::(#"0"::(#"a"::xs)))) = (#"\n"::format xs)
+            | format (#"\\"::(#"x"::(#"0"::(#"a"::xs)))) = (#"\\"::(#"n"::format xs))
             | format (x::xs) = x :: (format xs) (* otros casos *)
     	val l = newlabel()
         val str = (implode o format o explode) s
+
         val _ = datosGlobs:=(!datosGlobs @ [STRING(l, str)])
     in  
     	Ex(NAME l) 
