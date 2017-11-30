@@ -200,10 +200,8 @@ fun transExp(venv, tenv) =
 						| _ => error(typ^" no es de tipo record", nl))
 					| NONE => error("Tipo inexistente ("^typ^")", nl)
 				
-				(* 	Verificar que cada campo esté en orden y tenga una expresión del tipo que corresponde.
-					A cada expresión de cada field del record se le asigna la posición correspondiente, 
-					donde la expresión se encuentra ya traducida en código intermedio.
-				*)
+				(* 	Verificar que cada campo esté en orden y tenga una expresión del tipo que corresponde. 
+				No tengo en cuenta la posición del campo. *)
 				fun verificar _ [] [] = []
 				  | verificar _ (c::cs) [] = error("Faltan campos", nl)
 				  | verificar _ [] (c::cs) = error("Sobran campos", nl)
