@@ -1,6 +1,8 @@
 structure tigerregalloc :> tigerregalloc = 
 struct
 
+	(* simpifyWorklist INV: if v in simplifyWorklist => v not in precolored *)
+
 	(* Each temp maps a machine register *)
 	type allocation = (tigertemp.temp, tigerframe.register) Splaymap.dict
 
@@ -36,7 +38,7 @@ struct
 
 	fun regAlloc (instrList, frame) =
 		let
-
+			(*val _ = print("\nsin colorear = "^(utils.listToString instrList (tigerassem.format tigertemp.makeString))^"\n")*)
 			(* DATA STRUCTURES *)
 
 			(* Node work-lists, sets, and stacks. The following lists and sets are always mutually disjoint 
@@ -128,7 +130,11 @@ struct
 			val iGraph : tigerliveness.node Splayset.set ref = ref (Splayset.empty tigerliveness.compareNodes)
 			val liveOutTable : tigertemp.temp Splayset.set list ref = ref []
 
-			
+			(* getLiveOutSetFromInstrNum : int -> tigertemp.temp Splayset.set *)
+			fun getLiveOutSetFromInstrNum (nodeNum : int) : tigertemp.temp Splayset.set =
+				List.nth(!liveOutTable, nodeNum)
+					handle Subscript => raise Fail "Error - regAlloc. getLiveOutSetFromInstrNum(): Subscript error"
+
 			(* Prints current iGraph and liveOutTable information *)
 			(* printIGraphAndLiveOutInfo : unit -> unit *)
 			fun printIGraphAndLiveOutInfo() =
@@ -149,11 +155,6 @@ struct
 				in
 					()
 				end
-
-			(* getLiveOutSetFromInstrNum : int -> tigertemp.temp Splayset.set *)
-			fun getLiveOutSetFromInstrNum (nodeNum : int) : tigertemp.temp Splayset.set =
-				List.nth(!liveOutTable, nodeNum)
-					handle Subscript => raise Fail "Error - regAlloc. getLiveOutSetFromInstrNum(): Subscript error"
 
 			(* printDataStructure : string -> unit *)
 	       	fun printDataStructure ds =
@@ -208,7 +209,7 @@ struct
 								end
 					| "kColors" => print("\n"^"kColors = "^(utils.setToString kColors utils.id)^"\n")
 					| "alias" => print("\n"^"alias = "^(utils.dictToString (!alias) utils.id utils.id)^"\n")
-	       			| _ => raise Fail "Error - regAlloc. printDataStructure(): data structured not considered"
+	       			| _ => raise Fail "Error - regAlloc. printDataStructure(): data structure not considered"
 	       	
 	       	(* printAllDataStructures : unit -> unit *)
 	       	fun printAllDataStructures() =
@@ -236,6 +237,10 @@ struct
 	       		printDataStructure "alias";
 	       		print("\n====================\t End all data structures \t====================\n"))
 
+
+	       	(*val _ = (print("\nFirst color list = \n");
+	       			printDataStructure "color")*)
+
 			(* livenessAnalysis : unit -> unit *)
 			fun livenessAnalysis() =
 				let
@@ -260,13 +265,13 @@ struct
 					val allTmpsSet : tigertemp.temp Splayset.set = List.foldl (fn (tmpSet, s) => 
 						Splayset.union(tmpSet, s)) (Splayset.empty String.compare) graphList'
 				in
-					(initial := Splayset.difference(allTmpsSet, precolored);
+					initial := Splayset.difference(allTmpsSet, precolored);
 					adjList := Splayset.foldl (fn (tmp, dict) => 
 						Splaymap.insert(dict, tmp, emptyNodeSet)) (!adjList) allTmpsSet;
 					degree := Splayset.foldl (fn (tmp, dict) => 
 						Splaymap.insert(dict, tmp, 0)) (!degree) allTmpsSet;
 					moveList := Splayset.foldl (fn (tmp, dict) => 
-						Splaymap.insert(dict, tmp, emptyMoveSet)) (!moveList) allTmpsSet)	
+						Splaymap.insert(dict, tmp, emptyMoveSet)) (!moveList) allTmpsSet
 				end
 
 			(* addEdge : (tigertemp.temp * tigertemp.temp) -> unit *)
@@ -356,7 +361,7 @@ struct
 				let
 					val union = Splayset.union(!activeMoves, !worklistMoves)
 					val moveList_n = case Splaymap.peek(!moveList, n) of
-						SOME moveSet => moveSet
+						SOME set => set
 						| NONE => raise Fail "Error - regAlloc. nodeMoves() peek error"
 				in
 					Splayset.intersection(moveList_n, union)
@@ -369,7 +374,7 @@ struct
 			(* makeWorklist : tigertemp.temp Splayset.set -> unit *)
 			fun makeWorklist() =
 				Splayset.app (fn n => 
-					(initial := Splayset.difference(!initial, Splayset.singleton String.compare n);
+					(initial := Splayset.delete(!initial, n);
 					let
 						val degree_n = case Splaymap.peek(!degree, n) of
 							SOME i => i
@@ -389,11 +394,15 @@ struct
 			(* adjacent : tigertemp.temp -> tigertemp.temp Splayset.set *)
 			fun adjacent n =
 				let
+					(*val _ = printDataStructure "selectStack"*)
 					val adjList_n = case Splaymap.peek(!adjList, n) of
 						SOME tmpSet => tmpSet
 						| NONE => raise Fail "Error - regAlloc. adjacent() peek error"
 
 					val union = Splayset.union(Splayset.addList(Splayset.empty String.compare, !selectStack), !coalescedNodes)
+
+					(*val _ = (print("\nLater... \n");
+							printDataStructure "selectStack")*)
 				in
 					Splayset.difference(adjList_n, union)
 				end
@@ -595,6 +604,9 @@ struct
 							getAlias x 
 						else 
 							getAlias y
+
+						(*val _ = (print("\nvalue of v = "^v^"\n");
+								print("\nm = "^(utils.pairToString m utils.id utils.id)^"\n"))*)
 					in
 						(activeMoves := Splayset.difference(!activeMoves, Splayset.singleton cmpPairs m);
 						frozenMoves := Splayset.union(!frozenMoves, Splayset.singleton cmpPairs m);
@@ -657,6 +669,8 @@ struct
 					val minIndex = Splayset.foldl chooseMinIndex (tigertemp.lastTempIndex()) (!spillWorklist)
 					val m = "T"^Int.toString minIndex
 
+					(*val _ = print("\nnode selected from selectSpill() = "^m^"\n")*)
+
 					val singleton_m = Splayset.singleton String.compare m
 				in
 					(spillWorklist := Splayset.difference(!spillWorklist, singleton_m);
@@ -665,89 +679,92 @@ struct
 				end
 
 			(* repeat : unit -> unit *)
-			fun repeat() =
-	            let 
-	            	val _ = if not(Splayset.isEmpty (!simplifyWorklist)) then simplify()
-	                        else if not(Splayset.isEmpty (!worklistMoves)) then coalesce()
-	                        else if not(Splayset.isEmpty (!freezeWorklist)) then freeze()
-	                        else if not(Splayset.isEmpty (!spillWorklist)) then selectSpill()
-	                        else ()
-	                val _ = if Splayset.isEmpty (!simplifyWorklist)
-	                            andalso Splayset.isEmpty (!worklistMoves)
-	                            andalso Splayset.isEmpty (!freezeWorklist)
-	                            andalso Splayset.isEmpty (!spillWorklist)
-	                        then ()
-	                        else repeat()
-	            in 
-	            	()
-	            end
+	        fun repeat() =
+	        	while not(Splayset.isEmpty (!simplifyWorklist)
+	        			andalso Splayset.isEmpty (!worklistMoves)
+	        			andalso Splayset.isEmpty (!freezeWorklist)
+	        			andalso Splayset.isEmpty (!spillWorklist)) do
+	        		(if not(Splayset.isEmpty (!simplifyWorklist)) 
+	        			then 
+	        				(simplify();
+	        				print("\n**simplify() DONE\n");
+	        				printDataStructure "simplifyWorklist")
+	        			else 
+	        				if not(Splayset.isEmpty (!worklistMoves)) 
+	        				then 
+	        					(coalesce();
+	        					print("\n**coalesce() DONE\n");
+	        					printDataStructure "simplifyWorklist")
+	        				else 
+	        					if not(Splayset.isEmpty (!freezeWorklist)) 
+	        					then 
+	        						(freeze();
+	        						print("\n**freeze() DONE\n");
+	        						printDataStructure "simplifyWorklist") 
+	        					else 
+	        						if not(Splayset.isEmpty (!spillWorklist)) 
+	        						then 
+	        							(selectSpill();
+	        							print("\n*selectSpill() DONE\n");
+	        							printDataStructure "simplifyWorklist")
+	        						else 
+	        							())
 
 	        (* assignColors : unit -> unit *)
 	       	fun assignColors() =
-	            let 
-	            	fun whileStackNotEmpty() =
-	                    if (!selectStack) <> []
-	                    then 
-	                        let 
-	                        	val n = popStack()
-								val okColors = ref kColors
+	            (while ((!selectStack) <> []) do 
+	            	(let
+	            		(*val _ = printDataStructure "selectStack"*)
+	            		val n = popStack()
+	            		(*val _ = print("\nn = "^n^"\n")*)
+	            		val okColors = ref kColors
 
-								val _ = case Splaymap.peek(!adjList, n) of
-									NONE => ()
-									| SOME adjList_n =>
-									    let 
-									    	val union = Splayset.union(!coloredNodes, precolored)
-									    in
-									        Splayset.app (fn w =>
-									            let 
-									            	val alias_w = getAlias w
-									            in
-													if Splayset.member(union, alias_w)
-													then 
-														let 
-															val color_alias_w = Splaymap.find(!color, alias_w)
-														in
-													   okColors := Splayset.difference(!okColors, Splayset.singleton String.compare color_alias_w)
-														end
-													else 
-														()
-									            end) adjList_n
-									    end
+	            		val adjList_n = case Splaymap.peek(!adjList, n) of
+	            			SOME s => s
+	            			| NONE => raise Fail "Error - regAlloc. assignColors(): adjList peek error"
+	            	in
+	            		Splayset.app (fn w => 
+	            			if Splayset.member(Splayset.union(!coloredNodes, precolored), getAlias w) 
+	            			then 
+	            				let
+	            					val color_getAlias_w = case Splaymap.peek(!color, getAlias w) of
+	            						SOME tmp => tmp
+	            						| NONE => raise Fail "Error - regAlloc. assignColors(): color[getAlias w] peek error"
+	            				
+	            					(*val _ = (print("\nw = "^w^"\n");
+	            							print("\ngetAlias[w] = "^color_getAlias_w^"\n"))*)
+	            				in
+	            					okColors := Splayset.difference(!okColors, Splayset.singleton String.compare color_getAlias_w)
+	            				end
+	            			else 
+	            				()) adjList_n;
+	            		if Splayset.isEmpty (!okColors) 
+	            		then 
+	            			spilledNodes := Splayset.union(!spilledNodes, Splayset.singleton String.compare n) 
+	            		else 
+	            			(coloredNodes := Splayset.union(!coloredNodes, Splayset.singleton String.compare n);
+	            			let
+	            				val c = case Splayset.find (fn _ => 
+	            					true) (!okColors) of
+	            					SOME c' => c'
+	            					| NONE => "" (* is this ok? Should not display error not found? *)
 
-								val _ = if Splayset.isEmpty(!okColors)
-										then 
-											spilledNodes := Splayset.add(!spilledNodes, n)
-										else 
-											let 
-												val _ = coloredNodes := Splayset.add(!coloredNodes, n)
-											    val c = case Splayset.find (fn _ => true) (!okColors) of
-											        SOME c' => c'
-											        | _ => raise Fail "Error - regAlloc. assignColors(): okColors find error; no debería pasar"
-											    val _ = color := Splaymap.insert(!color, n, c)
-											in 
-												()
-											end
-	                         	in 
-                         			whileStackNotEmpty()
-                         		end
-	                    else 
-	                    	()
-	            in 
-	            	whileStackNotEmpty();
-            		Splayset.app (fn n =>
-                        let
-                        	(* This value always has to exist? *)
-                        	val color_alias_n = case Splaymap.peek(!color, getAlias n) of
-                                SOME c => c
-                                | NONE => let
-		                                	val _ = print("\ngetAlias "^n^" = "^getAlias n^"\n")
-		                                in
-		                                	raise Fail "Error - regAlloc. assignColors(): color[getAlias n] no existe"
-		                                end
-                        in 
-                        	color := Splaymap.insert(!color, n, color_alias_n)
-                        end) (!coalescedNodes)
-            	end
+	            				(*val _ = (print("\nn = "^n^"\n");
+	            							print("\ncolor[n] = "^c^"\n"))*)
+	            			in
+	            				color := Splaymap.insert(!color, n, c)
+	            			end)
+	            	end
+	            	);
+	            	Splayset.app (fn n => 
+	            	let
+	            		val color_getAlias_n = case Splaymap.peek(!color, getAlias n) of
+	            			SOME c => c
+	            			| NONE => ""
+	            	in
+	            		color := Splaymap.insert(!color, n, color_getAlias_n)
+	            	end) (!coalescedNodes)
+	            )
 
 	       	(* rewriteProgram() allocates memory locations for the spilled nodes temporaries and 
 	       	inserts store and fetch instructions to access them. Those stores and fetches are 
@@ -778,9 +795,8 @@ struct
 	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newStore() peek error"
 	       				in
 	       					tigerassem.OPER {
-	       						assem = "movq `s0, "^utils.intToString oldTmpOffset^"(`s1) #\tSPILLED - STORE\n",
-	       						src = [newTmp,
-	       							tigerframe.fp],
+	       						assem = "movq `s0, "^utils.intToString oldTmpOffset^"(%rbp) #\tSPILLED - STORE\n",
+	       						src = [newTmp],
 	       						dst = [],
 	       						jump = NONE
 	       					}
@@ -794,8 +810,8 @@ struct
 	       						| NONE => raise Fail "Error - regAlloc. rewriteProgram(). newLoad() peek error"
 	       				in
 	       					tigerassem.OPER {
-	       						assem = "movq "^utils.intToString oldTmpOffset^"(`s0), `d0 #\tSPILLED - LOAD\n",
-	       						src = [tigerframe.fp],
+	       						assem = "movq "^utils.intToString oldTmpOffset^"(%rbp), `d0 #\tSPILLED - LOAD\n",
+	       						src = [],
 	       						dst = [newTmp],
 	       						jump = NONE
 	       					}
@@ -1005,20 +1021,26 @@ struct
 			print("\n**makeWorklist() DONE\n");
 			checkInvariants();
 			repeat();
-			print("\n**repeat() DONE\n");
 			assignColors();
 			print("\n**assignColors() DONE\n");
+			printDataStructure "color";
 			if not(Splayset.isEmpty (!spilledNodes))
 			then 
 				let
-					val _ = print("\n**rewriteProgram() DONE\n")
+					val _ = print("\n**rewriteProgram() DONE\n")		
 				in
 					(* perform algorithm all over again with new 
 						altered graph *)
 					regAlloc(rewriteProgram(), frame)
 				end
-			else 
-				(!color, deleteMoves instrList)
+			else
+				let
+				 	(*val _ = (print("\nRESULT OF FINAL COLORING: \n");
+				 			printDataStructure "color")*)
+				 in
+				 	(!color, deleteMoves instrList)
+				 end 
+				
 		end
 
 end
