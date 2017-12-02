@@ -534,42 +534,41 @@ struct
 				| munchExp(BINOP(DIV, _, CONST 0)) = raise Fail "Error - munchExp(): división por cero!"	(* hacen falta casos así? creo que no *)
 
 				| munchExp(BINOP(DIV, e1, e2)) = 
-					let
-						val tmpe2 = munchExp e2						(* Temporary containing expression e2 *)
-					in
-						generateTmp(fn r => 
-							(munchStm(MOVE(TEMP tigerframe.rax, e1));
-							emit(OPER{
-									assem="cqto\n",					(* cqto: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
-																	broadcasts the sign bit of RAX into every bit of RDX *)
-									src=[tigerframe.rax],
-									dst=[tigerframe.rdx],
-									jump=NONE
-								});
-							emit(OPER{
-									assem="idivq `s1\n",			(* idivq: Signed divide RDX:RAX by tmpe2. Quotient stored in RAX. Remainder stored in RDX *)
-									src=[tigerframe.rax,
-										tmpe2],
-									dst=[tigerframe.rax,
-										tigerframe.rdx],
-									jump=NONE
-								});
-							munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))	(* Move result of division to result temp *)
-					end
+					generateTmp(fn r => 
+						(munchStm(MOVE(TEMP tigerframe.rax, e1));
+						emit(OPER{
+								assem="cqto\n",					(* cqto: Sign-extends the contents of RAX to RDX:RAX (now, 128 bits) - 
+																broadcasts the sign bit of RAX into every bit of RDX *)
+								src=[],
+								dst=[tigerframe.rdx],
+								jump=NONE
+							});
+						emit(OPER{
+								assem="idivq `s0\n",			(* idivq: Signed divide RDX:RAX by tmpe2. Quotient stored in RAX. Remainder stored in RDX *)
+								src=[munchExp e2,
+									tigerframe.rax],
+								dst=[tigerframe.rax,
+									tigerframe.rdx],
+								jump=NONE
+							});
+						munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))	(* Move result of division to result temp *)
 
 				(* MUL op cases *)
 
 				| munchExp(BINOP(MUL, e1, e2)) =
 					generateTmp(fn r => 
-						(munchStm(MOVE(TEMP r, e1));
+						(munchStm(MOVE(TEMP tigerframe.rax, e1));
 						emit(OPER{
-								assem="imulq `s0, `d0\n",
-								src=[munchExp e2, r],
-								dst=[r],
+								assem="imulq `s0\n",
+								src=[munchExp e2, 
+									tigerframe.rax],
+								dst=[tigerframe.rax, 
+									tigerframe.rdx],
 								jump=NONE
-							})))
+							});
+						munchStm(MOVE(TEMP r, TEMP tigerframe.rax))))
 
-				| munchExp(BINOP(_,_,_)) = raise Fail "Error - munchExp(): operación binaria no soportada"
+				| munchExp(BINOP _) = raise Fail "Error - munchExp(): operación binaria no soportada"
 
 		in
 			(munchStm stm; rev (!ilist))
