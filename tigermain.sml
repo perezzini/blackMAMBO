@@ -101,17 +101,16 @@ fun main(args) =
 			end) canonProcs
 
 		(* Format, using tigertemp.makeString, each instruction converted to assembly language *)
-		val assemString : (tigertemp.label * string list) list = List.map (fn (ilist, frame) => 
-			(tigerframe.name frame, 
-				List.map (tigerassem.format tigertemp.makeString) ilist)) assem	(* Since I have not done register assignment yet, I just pass 
-																				tigertemp.makeString to format as the translation function from 
-																				temporaries to strings *)
+		fun assemToString (assem : (tigerassem.instr list * tigerframe.frame) list) : (tigertemp.label * string list) list = 
+			List.map (fn (ilist, frame) => 
+				(tigerframe.name frame, List.map (tigerassem.format tigertemp.makeString) ilist)) assem
+
 		(* -code OPTION *)
 		val _ = if code 
 				then 
 					List.app (fn (fName, instrStrList) => 
 						(print("\n"^fName^":\n\n");
-							List.app print instrStrList)) assemString
+							List.app print instrStrList)) (assemToString assem)
 				else 
 					()
 
@@ -188,7 +187,7 @@ fun main(args) =
 		val _ = if color 
 				then 
 				  List.app (fn (instrListStr, frame) => 
-					(print("\n"^tigerframe.name frame^"(instruction list length = "^Int.toString (List.length instrListStr)^"):\n\n");
+					(print("\n"^tigerframe.name frame^" (instruction list length = "^Int.toString (List.length instrListStr)^"):\n\n");
 					  List.app print instrListStr)) (computeRegisterAllocation assem)
 				else 
 				  ()
