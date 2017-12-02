@@ -72,7 +72,7 @@ depend: tigerabs.sml tigergrm.sml tigerlex.sml tigermain.sml \
 tigerliveness.ui: tigerassem.uo tigertemp.ui 
 tigerassem.uo: tigertemp.ui 
 tigerpila.uo: tigerpila.ui 
-tigertree.uo: tigertemp.ui 
+tigertree.uo: tigertab.ui tigertemp.ui 
 tigertemp.uo: tigertemp.ui 
 tigertopsort.uo: tigertopsort.ui tigertab.ui tigertips.uo tigerabs.uo \
     tigermuestratipos.ui 
@@ -86,8 +86,7 @@ tigermain.uo: tigerseman.ui tigercodegen.ui tigertree.uo tigerescap.ui \
     tigerassem.uo tigerinterp.uo tigertemp.ui tigerlex.uo tigerliveness.ui \
     tigertrans.ui tigerpp.uo 
 tigerseman.uo: tigerseman.ui tigersres.uo tigertab.ui tigerpila.ui \
-    tigertopsort.ui tigertemp.ui tigerabs.uo tigermuestratipos.ui \
-    tigertrans.ui 
+    tigertopsort.ui tigertemp.ui tigerabs.uo tigertrans.ui 
 tigertopsort.ui: tigertab.ui tigertips.uo tigerabs.uo 
 tigerseman.ui: tigerabs.uo 
 tigergrm.uo: tigergrm.ui tigernlin.uo tigerabs.uo 
@@ -98,7 +97,7 @@ tigerescap.uo: tigerescap.ui tigertab.ui tigerabs.uo
 tigermuestratipos.uo: tigermuestratipos.ui tigertips.uo 
 utils.uo: utils.ui 
 tigerliveness.uo: tigerliveness.ui utils.ui tigerassem.uo tigertemp.ui 
-tigerframe.uo: tigerframe.ui utils.ui tigertree.uo tigerassem.uo \
+tigerframe.uo: tigerframe.ui utils.ui tigertree.uo tigerit.uo tigerassem.uo \
     tigertemp.ui 
 tigerregalloc.ui: tigerframe.ui tigerassem.uo tigertemp.ui 
 tigerit.uo: tigertree.uo tigertab.ui 
