@@ -1,0 +1,10 @@
+let
+  type  arrtype1 = array of int
+  type	arrtype2 = array of arrtype1
+
+  var arr1 : arrtype1 := arrtype1 [10] of 0
+  var arr2 : arrtype2 := arrtype2 [10] of arr1
+
+in
+  if arr2[3][4] = 0 then print("\ntrue\n") else print("\nfalse\n"); 0
+end
