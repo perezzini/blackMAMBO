@@ -88,8 +88,10 @@ struct
 	val callersaves = [r10, r11]					(* registers that must be preserved by the caller *)
 	val calleesaves = [rbx, r12, r13, r14, r15]		(* registers that must be saved across function calls *)
 	
+	(* registers possible written by the callee function *)
 	val calldefs = [rv] 
 					@ callersaves
+					@ argregs 	(* is this ok? Apparently, it solved part of my problems... *)
 
 	(* all machine registers *)
 	val registers = [rv]
