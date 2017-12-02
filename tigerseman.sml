@@ -302,40 +302,52 @@ fun transExp(venv, tenv) =
 				val _ = postWhileForExp()
 
 			in
-				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit then {exp=exptrans, ty=TUnit}
-				else if tipoReal(#ty ttest, tenv) <> TInt then error("Error de tipo en la condición", nl)
-				else error("El cuerpo de un while no puede devolver un valor", nl)
+				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit 
+				then 
+					{exp=exptrans, ty=TUnit}
+				else 
+					if tipoReal(#ty ttest, tenv) <> TInt 
+					then 
+						error("Error de tipo en la condición", nl)
+					else 
+						error("El cuerpo de un while no puede devolver un valor", nl)
 			end
 		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
 			let
 				(* Veamos que lo y hi tienen tipo TInt *)
 				val {ty=tylo, exp=explo} = trexp lo
 				val {ty=tyhi, exp=exphi} = trexp hi
-				val _ = if tipoReal(tylo, tenv) = TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo TInt", nl)
-			
-				(* Acceso de var *)
-				val access' = allocLocal(topLevel()) (!escape)
-
-				val level' = getActualLev()
+				val _ = if 
+						tipoReal(tylo, tenv) = TInt andalso tiposIguales tylo tyhi 
+						then 
+							() 
+						else 
+							error("Las cotas del for no son de tipo TInt", nl)
+				
+				val level = getActualLev()
+				val access = allocLocal(topLevel()) (!escape)
+				val venv' = tabRInserta(var, 
+										VIntro{access=access, level=level}, 
+										venv)
 
 				val _ = preWhileForExp()
-
-				val venv' = tabRInserta(var, 
-										VIntro{access=access', level=level'}, 
-										venv)
 
 				val {exp=eb', ty=tb'} = transExp (venv', tenv) body
 
 				(* tb' debe ser TUnit *)
-				val _ = if tiposIguales tb' TUnit then () else error("El body de una expresión For debe ser TUnit", nl)
+				val _ = if tiposIguales tb' TUnit 
+						then 
+							() 
+						else 
+							error("El body de una expresión For debe ser TUnit", nl)
 
 				(* Preparamos código intermedio *)
-				val ev' = simpleVar(access', 0)
+				val ev' = simpleVar(access, level)
 				val ef' = forExp{lo=explo, hi=exphi, var=ev', body=eb'}
 
 				val _ = postWhileForExp()
 			in
-				{exp=ef', ty=TUnit}
+				{exp=ef', ty=tb'}
 			end
 		| trexp(LetExp({decs, body}, _)) =
 			let
