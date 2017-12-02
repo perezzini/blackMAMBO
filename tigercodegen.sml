@@ -127,23 +127,14 @@ struct
 							jump=NONE
 						})
 
-				| munchStm(MOVE(TEMP t1, TEMP t2)) =
-					emit(tigerassem.MOVE{
-							assem="movq `s0, `d0\n",
-							src=t2,
-							dst=t1
-						})
 
 				| munchStm(MOVE(TEMP t, CALL(NAME f, args))) =
-					let
-						val _ = munchStm(EXP(CALL(NAME f, args)))	(* "Execute" call *)
-					in
-						emit(tigerassem.MOVE{
-								assem="movq `s0, `d0\n",
-								src=tigerframe.rv,
-								dst=t
-							})
-					end
+					(munchStm(EXP(CALL(NAME f, args)));		(* Execute call *)
+					emit(tigerassem.MOVE{
+							assem="movq `s0, `d0\n",
+							src=tigerframe.rv,
+							dst=t
+						}))
 
 				| munchStm(MOVE(TEMP t, e)) =
 					emit(tigerassem.MOVE{
@@ -152,7 +143,7 @@ struct
 							dst=t
 						})
 
-				| munchStm(MOVE(_, _)) = raise Fail "Error - munchStm(): MOVE inválido a un no temporario/memoria"
+				| munchStm(MOVE _) = raise Fail "Error - munchStm(): MOVE inválido a un no temporario/memoria"
 
 				| munchStm(LABEL lab) =
 					emit(tigerassem.LABEL{
@@ -280,43 +271,43 @@ struct
 									let 
 										val _ = case a of
 											CONST i => emit(OPER{
-													assem="pushq $"^utils.intToString i^"\n",
+													assem="pushq $"^utils.intToString i^" #\tFROM tigercodegen.munchArgs()\n",
 													src=[],
 													dst=[],
 													jump=NONE
 												})
 											| NAME l => emit(OPER{
-													assem="pushq $"^l^"\n",
+													assem="pushq $"^l^" #\tFROM tigercodegen.munchArgs()\n",
 													src=[],
 													dst=[],
 													jump=NONE
 												})
 											| TEMP t => emit(OPER{
-													assem="pushq `s0\n",
+													assem="pushq `s0 #\tFROM tigercodegen.munchArgs()\n",
 													src=[t],
 													dst=[],
 													jump=NONE
 												})
 											| MEM(TEMP t) => emit(OPER{
-													assem="pushq (`s0)\n",
+													assem="pushq (`s0) #\tFROM tigercodegen.munchArgs()\n",
 													src=[t],
 													dst=[],
 													jump=NONE
 												})
 											| MEM(BINOP(PLUS, e, CONST i)) => emit(OPER{
-													assem="pushq "^utils.intToString i^"(`s0)\n",
+													assem="pushq "^utils.intToString i^"(`s0) #\tFROM tigercodegen.munchArgs()\n",
 													src=[munchExp e],
 													dst=[],
 													jump=NONE
 												})
 											| MEM(e) => emit(OPER{
-													assem="pushq (`s0)\n",
+													assem="pushq (`s0) #\tFROM tigercodegen.munchArgs()\n",
 													src=[munchExp e],
 													dst=[],
 													jump=NONE
 												})
 											| _ => emit(OPER{
-													assem="pushq `s0\n",
+													assem="pushq `s0 #\tFROM tigercodegen.munchArgs()\n",
 													src=[munchExp a],
 													dst=[],
 													jump=NONE
@@ -372,7 +363,7 @@ struct
 								dst=[r],
 								jump=NONE
 							})))
-
+				(*
 				| munchExp(BINOP(PLUS, NAME l, e)) =
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
@@ -382,6 +373,7 @@ struct
 								dst=[r],
 								jump=NONE
 							})))
+				*)
 
 				| munchExp(BINOP(PLUS, TEMP t, e)) =
 					generateTmp(fn r => 
@@ -456,7 +448,7 @@ struct
 								dst=[r],
 								jump=NONE
 							})))
-
+				(*
 				| munchExp(BINOP(MINUS, e, NAME l)) =
 					generateTmp(fn r => 
 						(munchStm(MOVE(TEMP r, e));
@@ -466,6 +458,7 @@ struct
 								dst=[r],
 								jump=NONE
 							})))
+				*)
 
 				| munchExp(BINOP(MINUS, e, TEMP t)) =
 					generateTmp(fn r => 
