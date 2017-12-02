@@ -4,10 +4,10 @@
 
 typedef struct {
     long length;
-    unsigned char chars[0];
+    unsigned char chars[1];
 } string;
 string consts[256];
-string empty = {0};
+string empty = {0, ""};
 
 long *_initArray(long size, long init)
 {
