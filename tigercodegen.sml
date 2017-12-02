@@ -213,15 +213,14 @@ struct
 					let
 						val diff = List.length args - List.length (tigerframe.argregs)
 					in
-						(* preguntar si es _allocRecord *)
 						emit(OPER{
-								assem="movq $0, `d0 # added\n",
+								assem="movq $0, `d0 # SOME EXTERNAL CALLS' PARAMETERS ARE NOT FIXED\n",
 								src=[],
 								dst=[tigerframe.rv],
 								jump=NONE
 							});
 						emit(OPER{
-								assem="call "^f^"\n",
+								assem="call "^f^" # FROM munchStm(); diff = "^Int.toString diff^"\n",
 								src=(munchArgs args) @ [tigerframe.rv],
 								dst=tigerframe.calldefs,
 								jump=NONE
