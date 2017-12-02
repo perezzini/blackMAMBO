@@ -202,7 +202,20 @@ struct
 		| exp(InReg l) _ = TEMP l
 
 	(* externalCall : string * tigertree.exp list -> tigertree.exp *)
-	fun externalCall(s, l) = CALL(NAME s, l)
+	fun externalCall(s : string, l : tigertree.exp list) : tigertree.exp =
+		let
+			fun debug() =
+				let
+				in
+					print("\n======= DEBUGGING FROM tigerframe.externalCall(). External call: "^s^"\n");
+					print("\nList of arguments = "^(utils.listToString l tigertree.tree)^"\n");
+					print("\n=======\n")
+				end
+
+			(*val _ = debug()*)
+		in
+			CALL(NAME s, l)
+		end
 
 	(* seq : tigertree.stm list -> tigertree.stm *)
 	fun seq [] = EXP (CONST 0)
