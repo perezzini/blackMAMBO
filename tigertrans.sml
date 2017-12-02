@@ -153,11 +153,9 @@ val datosGlobs = fraglist
 *)
 fun procEntryExit{level: level, body} =
 	let	
-		val label = STRING(name(#frame level), "") (* name : frame -> tigertemp.label *)
 		val body' = PROC{frame= #frame level, body=unNx body}
-		val final = STRING(";;-------", "")
 	in	
-		datosGlobs:=(!datosGlobs @ [label, body', final]) 
+		datosGlobs:=(!datosGlobs @ [body']) 
 	end
 
 (* getResult : unit -> frag list *)
@@ -260,15 +258,16 @@ fun varDec(acc) = simpleVar(acc, getActualLev())
 (* var.field: seleccionar campo de un record *)
 (* fieldVar : exp * int -> exp *)
 fun fieldVar(var, field) = 
-	(* Cada field de un record ocupa un word-size *)
 	let
-		val v = unEx var (* puntero a la dir de memoria base (estructura) del record *)
-		val rv = newtemp()
+	    val a = unEx var
+	    val ra = tigertemp.newtemp()
+	    val ri = tigertemp.newtemp()
 	in
-		Ex(ESEQ(seq[MOVE(TEMP rv, v),
-					EXP(externalCall("_checkNil", [TEMP rv]))],
-					MEM(BINOP(PLUS, TEMP rv,
-								BINOP(MUL, CONST field, CONST tigerframe.wSz)))))
+	    Ex(ESEQ(seq[MOVE(TEMP ra, a),
+	        MOVE(TEMP ri, CONST field),
+	        EXP(externalCall("_checkNil", [TEMP ra]))],
+	        MEM(BINOP(PLUS, TEMP ra,
+	            BINOP(MUL, TEMP ri, CONST tigerframe.wSz)))))
 	end
 
 (* arr[ind]: acceso a un índice de un arreglo *)
@@ -292,30 +291,12 @@ fun subscriptVar(arr, ind) =
 (* recordExp : (exp * int) list -> exp *)
 fun recordExp l =
 	let
-		(* a{f1 = e1, ..., fn = en} *)
-
-		(* "The simplest way to create a record is to call an external memory-allocation 
-		function that returns a pointer to an n-word area into a new temp r. Then a series 
-		of MOVE trees can init offsets 0, 1W, 2W, ..., (n-1)W from r with translations of 
-		expressions ei. Finally, the result of the whole expression is TEMP(r)" - pag 164 *)
-		val ret = newtemp()
-
-		fun genTemps 0 = []
-			| genTemps n = newtemp() :: genTemps(n-1)
-
-		val regs = genTemps(List.length l) (* se genera un temporario para cada campo del record *)
-
-		fun aux ((e, s), t) = (MOVE(TEMP t, unEx e), s, TEMP t)
-
-		val lexps = map aux (ListPair.zip (l, regs))
-		val lexps' = map #1 lexps
-		val l' = Listsort.sort (fn ((_, m, _), (_, n, _)) => 
-			Int.compare(m, n)) lexps (* ordena las ternas que genera la función aux dependiendo la pos 
-										de los campos en memoria *)
+	    val exps = List.map (fn (e, _) => unEx e) l
+	    val len = CONST (List.length l)
 	in
-		Ex(ESEQ(seq(lexps'),
-				externalCall("_allocRecord", CONST (List.length l) :: (List.map #3 l'))))
+	    Ex(externalCall("_allocRecord", len :: exps))
 	end
+
 
 (* arrayExp : {size: exp, init: exp} -> exp *)
 fun arrayExp{size, init} =
@@ -479,37 +460,44 @@ fun whileExp {test: exp, body: exp, lev:level} =
 
 (* forExp : {lo: exp, hi: exp, var: exp, body: exp} -> exp *)
 fun forExp {lo, hi, var, body} =
-    let 
-        val var' = unEx var
+    let val var' = unEx var
         val (l1, l2, lsal) = (newlabel(), newlabel(), topSalida())
+        val body' = unNx body
     in
-        case hi of
-          Ex (CONST n) =>
-               Nx (seq [MOVE (var', unEx lo),
-                        CJUMP (LE, var', CONST n, l2, lsal),
-                        LABEL l2, 
-                          unNx body,
-                          CJUMP (EQ, var', CONST n, lsal, l1),
-                        LABEL l1, 
-                          MOVE (var', BINOP (PLUS, var', CONST 1)),
-                          JUMP (NAME l2, [l2]),
-                        LABEL lsal])
+        Nx (seq (case hi of
+                Ex (CONST n) =>
+                    if valOf Int.maxInt > n then (* while *)
+                        [MOVE (var', unEx lo),
+                         JUMP (NAME l2, [l2]),
+                         LABEL l1, 
+                         body',
+                         MOVE (var', BINOP (PLUS, var', CONST 1)),
+                         LABEL l2, 
+                         CJUMP (GT, var', CONST n, lsal, l1),
+                         LABEL lsal]
+                    else
+	                    [MOVE (var', unEx lo),
+	                     LABEL l1,
+	                     body',
+	                     CJUMP (EQ, var', CONST n, lsal, l2),
+	                     LABEL l2,
+	                     MOVE (var', BINOP (PLUS, var', CONST 1)),
+	                     JUMP (NAME l1, [l1]),
+	                     LABEL lsal]
 
-        | _ => (* hi no es CONST *)
-            let 
-                val t_hi = newtemp()
-            in 
-               Nx (seq [MOVE (var', unEx lo),
-                        MOVE(TEMP t_hi, unEx hi),
-                        CJUMP (LE, var', TEMP t_hi, l2, lsal),
+                | _ => (* hi no es CONST *)
+                    let val t = newtemp()
+                    in [MOVE (var', unEx lo),
+                        MOVE (TEMP t, unEx hi),
+                        CJUMP (LE, var', TEMP t, l2, lsal),
                         LABEL l2, 
-                          unNx body,
-                          CJUMP (EQ, var', TEMP t_hi, lsal, l1),
+                        body',
+                        CJUMP (EQ, var', TEMP t, lsal, l1),
                         LABEL l1, 
-                          MOVE (var', BINOP (PLUS, var', CONST 1)),
-                          JUMP (NAME l2, [l2]),
-                        LABEL lsal])
-            end
+                        MOVE (var', BINOP (PLUS, var', CONST 1)),
+                        JUMP (NAME l2, [l2]),
+                        LABEL lsal]
+                    end))
     end
 
 (* La rama del IF computa un valor *)
