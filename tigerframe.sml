@@ -318,24 +318,24 @@ struct
 	(* "body" must be already colored *)
 	fun procEntryExit3 (f as {name, actualLocal, ...} : frame) (body : string) =
 		let
-			val localsSize = (!actualLocal) * wSz * ~1
+			val localsSize = (!actualLocal) * wSz
 
-			val prolog = String.concat [
+			val prologue = String.concat [
 				name^":\n",
-				"\t"^"pushq "^rbp^"\n",
-				"\t"^"movq "^rsp^", "^rbp^"\n",
-				"\t"^"subq $"^Int.toString(localsSize)^", "^rsp^"\n"
+				"\t"^"pushq "^fp^" # prologue\n",
+				"\t"^"movq "^sp^", "^fp^" # prologue\n",
+				"\t"^"subq $"^utils.intToString localsSize^", "^sp^"\t# prologue. !actualLocal = "^(utils.intToString (!actualLocal))^" (fp-8 is always reserved in stack for static link)"^"\n"
 			]
 			val body = body
-			val epilog = String.concat [
-				"\t"^"leave\n",
-				"\t"^"ret\n"
+			val epilogue = String.concat [
+				"\tleave # epilogue\n",
+				"\t"^"ret"^" # epilogue\n"
 			]
 		in
 			String.concat [
-				prolog,
+				prologue,
 				body,
-				epilog
+				epilogue
 			]
 		end
 
