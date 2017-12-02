@@ -602,11 +602,23 @@ struct
 							val degree_v = case Splaymap.peek(!degree, v) of
 								SOME i => i
 								| NONE => raise Fail "Error - regAlloc. freezeMoves() peek error"
+
+							(*val _ = (print("\nisEmpty (nodeMoves v) = "^Bool.toString (Splayset.isEmpty(nodeMoves v))^"\n");
+									print("\ndegree v = "^(utils.intToString degree_v)^"\n"))*)
+
+							(*val _ = print("\nnodeMoves "^v^" = "^(utils.setToString (nodeMoves v) (fn pair => 
+								utils.pairToString pair utils.id utils.id))^"\n")
+							val _ = print("\nnodeMoves "^u^" = "^(utils.setToString (nodeMoves u) (fn pair => 
+								utils.pairToString pair utils.id utils.id))^"\n")*)
 						in
-							if Splayset.isEmpty(nodeMoves v) andalso degree_v < k 
+							if not(Splayset.member(precolored, v)) (* is this ok? Added; not in original pseudo-code. If we not check this condition, the algorith (may be) would color precolored registers. *)
 							then 
-								(freezeWorklist := Splayset.difference(!freezeWorklist, Splayset.singleton String.compare v);
-								simplifyWorklist := Splayset.union(!simplifyWorklist, Splayset.singleton String.compare v)) 
+								if Splayset.isEmpty(nodeMoves v) andalso degree_v < k (* if v is a precolored node, degree[v] < k would always holds true *)
+								then 
+									(freezeWorklist := Splayset.difference(!freezeWorklist, Splayset.singleton String.compare v);
+									simplifyWorklist := Splayset.union(!simplifyWorklist, Splayset.singleton String.compare v)) 
+								else 
+									() 
 							else 
 								()
 						end)
