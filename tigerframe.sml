@@ -206,6 +206,9 @@ struct
 	(* externalCall : string * tigertree.exp list -> tigertree.exp *)
 	fun externalCall(s : string, l : tigertree.exp list) : tigertree.exp =
 		let
+			(*
+			For this function to run, must use tigerit.tree() but using exp() function instead of 
+			stm()
 			fun debug() =
 				let
 				in
@@ -213,6 +216,7 @@ struct
 					print("\nList of arguments = "^(utils.listToString l tigertree.tree)^"\n");
 					print("\n=======\n")
 				end
+			*)
 
 			(*val _ = debug()*)
 		in
