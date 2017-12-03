@@ -1,3 +1,7 @@
 let
-	function f(i:int, j:int):int=(print(chr(65 + i)); print(chr(65 + j)); print(chr(65 + 10*i+j)); 10*i+j)
-in print(chr(65+f(3, 5))); 0 end
+	var x : int := 10 /* escaped var */
+
+	function f(a : int) : int = x
+in
+	(if f(10)=10 then print("true") else print("false"); 0)
+end

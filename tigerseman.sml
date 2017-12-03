@@ -200,10 +200,8 @@ fun transExp(venv, tenv) =
 						| _ => error(typ^" no es de tipo record", nl))
 					| NONE => error("Tipo inexistente ("^typ^")", nl)
 				
-				(* 	Verificar que cada campo esté en orden y tenga una expresión del tipo que corresponde.
-					A cada expresión de cada field del record se le asigna la posición correspondiente, 
-					donde la expresión se encuentra ya traducida en código intermedio.
-				*)
+				(* 	Verificar que cada campo esté en orden y tenga una expresión del tipo que corresponde. 
+				No tengo en cuenta la posición del campo. *)
 				fun verificar _ [] [] = []
 				  | verificar _ (c::cs) [] = error("Faltan campos", nl)
 				  | verificar _ [] (c::cs) = error("Sobran campos", nl)
@@ -304,40 +302,52 @@ fun transExp(venv, tenv) =
 				val _ = postWhileForExp()
 
 			in
-				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit then {exp=exptrans, ty=TUnit}
-				else if tipoReal(#ty ttest, tenv) <> TInt then error("Error de tipo en la condición", nl)
-				else error("El cuerpo de un while no puede devolver un valor", nl)
+				if tipoReal(#ty ttest, tenv) = TInt andalso #ty tbody = TUnit 
+				then 
+					{exp=exptrans, ty=TUnit}
+				else 
+					if tipoReal(#ty ttest, tenv) <> TInt 
+					then 
+						error("Error de tipo en la condición", nl)
+					else 
+						error("El cuerpo de un while no puede devolver un valor", nl)
 			end
 		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
 			let
 				(* Veamos que lo y hi tienen tipo TInt *)
 				val {ty=tylo, exp=explo} = trexp lo
 				val {ty=tyhi, exp=exphi} = trexp hi
-				val _ = if tipoReal(tylo, tenv) = TInt andalso tiposIguales tylo tyhi then () else error("Las cotas del for no son de tipo TInt", nl)
-			
-				(* Acceso de var *)
-				val access' = allocLocal(topLevel()) (!escape)
-
-				val level' = getActualLev()
+				val _ = if 
+						tipoReal(tylo, tenv) = TInt andalso tiposIguales tylo tyhi 
+						then 
+							() 
+						else 
+							error("Las cotas del for no son de tipo TInt", nl)
+				
+				val level = getActualLev()
+				val access = allocLocal(topLevel()) (!escape)
+				val venv' = tabRInserta(var, 
+										VIntro{access=access, level=level}, 
+										venv)
 
 				val _ = preWhileForExp()
-
-				val venv' = tabRInserta(var, 
-										VIntro{access=access', level=level'}, 
-										venv)
 
 				val {exp=eb', ty=tb'} = transExp (venv', tenv) body
 
 				(* tb' debe ser TUnit *)
-				val _ = if tiposIguales tb' TUnit then () else error("El body de una expresión For debe ser TUnit", nl)
+				val _ = if tiposIguales tb' TUnit 
+						then 
+							() 
+						else 
+							error("El body de una expresión For debe ser TUnit", nl)
 
 				(* Preparamos código intermedio *)
-				val ev' = simpleVar(access', 0)
+				val ev' = simpleVar(access, level)
 				val ef' = forExp{lo=explo, hi=exphi, var=ev', body=eb'}
 
 				val _ = postWhileForExp()
 			in
-				{exp=ef', ty=TUnit}
+				{exp=ef', ty=tb'}
 			end
 		| trexp(LetExp({decs, body}, _)) =
 			let
@@ -526,7 +536,7 @@ fun transExp(venv, tenv) =
 							(* Analizo los tipos de los argumentos de la función, en busca de alguno no definido en tenv *)
 							val arguments = traducirParams params
 
-							val funLabel = if name = "_tigermain" then name else name^"_"^newlabel()
+							val funLabel = if name = "_tigermain" then name else "_"^name^"_"^newlabel()
 							val funLevel = newLevel{parent=topLevel(),
 													name=funLabel,
 													formals=map (! o #escape) params}
@@ -648,7 +658,10 @@ fun transProg ex =
 																	return Unit as final type of expression. *)
 	in	
 		(* DEBUGGING *)
+		(*
 		(tigermuestratipos.printTipo("\nTipo final del programa", tyt, tabAList(tab_tipos));
 		print "\n")
+		*)
+		()
 	end
 end

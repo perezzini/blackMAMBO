@@ -9,5 +9,5 @@ let
 			/* id(x) + x */
 		end
 in
-	f(43)
+	(if f(43)=34 then print("true") else print("false"); 0)
 end

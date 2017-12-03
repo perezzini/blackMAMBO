@@ -1,5 +1,5 @@
 let
-	function testIF(a:int):int = if a>1 then 1 else 0
+	function id(x: int, y: int) : int = x + y
 in
-	(if testIF(4) then print("ok") else print("not ok"); 0)
+	id(3,4)
 end

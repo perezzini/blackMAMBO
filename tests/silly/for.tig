@@ -1,0 +1,7 @@
+/* valid for and let */
+
+let
+	var a := 110
+in 
+	for i := 1 to 5 do (print("hey"); a := a + 1; ()); print(chr(a)); 0
+end

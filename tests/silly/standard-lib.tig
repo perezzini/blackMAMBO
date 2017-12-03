@@ -1,0 +1,6 @@
+let
+	var s1:string := "hello"
+	var s2:string := " world!"
+in
+	(print(substring(s1, 0, 2)); 0)
+end

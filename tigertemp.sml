@@ -20,5 +20,6 @@ in
 			j := !j+1;
 			s
 		end
+	fun lastTempIndex() = !i
 end
 end

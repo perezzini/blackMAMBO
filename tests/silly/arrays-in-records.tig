@@ -1,0 +1,8 @@
+let
+	type arr = array of int
+	type record = {id: int, str: string, a: arr}
+
+	var r:record := record{id = 2, str = "string", a = arr [10] of 1}
+in
+	if r.a[3] = 1 then print("true") else print("false"); 0
+end

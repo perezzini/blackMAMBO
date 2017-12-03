@@ -1,6 +1,0 @@
-let
-	var s:string := "hola"
-	var l:int := size(s)
-in
-	(if l=6 then print("true") else print("false"); 0)
-end

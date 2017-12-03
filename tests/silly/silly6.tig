@@ -1,1 +1,17 @@
-(print(substring("hola", 1, 2));0)
+let
+	var x : int := 10 /* escaped var */
+
+	function f() : int =
+		let
+			function g() : int =
+				let
+					function h() : int = x
+				in
+					h()
+				end
+		in
+			g()
+		end
+in
+	f()
+end
