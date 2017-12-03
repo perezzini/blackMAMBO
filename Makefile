@@ -72,7 +72,7 @@ depend: tigerabs.sml tigergrm.sml tigerlex.sml tigermain.sml \
 tigerliveness.ui: tigerassem.uo tigertemp.ui 
 tigerassem.uo: tigertemp.ui 
 tigerpila.uo: tigerpila.ui 
-tigertree.uo: tigertab.ui tigertemp.ui 
+tigertree.uo: tigertemp.ui 
 tigertemp.uo: tigertemp.ui 
 tigertopsort.uo: tigertopsort.ui tigertab.ui tigertips.uo tigerabs.uo \
     tigermuestratipos.ui 
