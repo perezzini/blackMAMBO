@@ -266,13 +266,11 @@ fun main(args) =
 				else 
 					()
 
-		(* Execute GCC *)
-		val _ = (Process.system("gcc -g -c runtime.c");
-				Process.system("gcc -g result.s runtime.o -o result");
-				Process.system("./result"))
-
-  in
+		(* Execute GCC, and run the input program *)
+		val _ = Process.system("gcc -g -c runtime.c && gcc -g result.s runtime.o -o result && ./result")
+	in
 		print("\nSuccessful compilation. Errors not found.\n")
-	end	handle Fail s => print("Fail: "^s^"\n")
+	end	
+		handle Fail s => print("Fail: "^s^"\n")
 
 val _ = main(CommandLine.arguments())
