@@ -71,6 +71,8 @@ val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	("not", Func{level=topLevel(), label="not",
 		formals=[TInt], result=TInt, extern=true}),
 	("exit", Func{level=topLevel(), label="exit",
+		formals=[TInt], result=TUnit, extern=true}),
+	("print_int", Func{level=topLevel(), label="print_int",
 		formals=[TInt], result=TUnit, extern=true})
 	])
 
