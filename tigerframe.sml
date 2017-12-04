@@ -335,7 +335,7 @@ struct
 			val body = body
 			val epilogue = String.concat [
 				"\tleave # epilogue\n",
-				"\t"^"ret"^" # epilogue\n"
+				"\tret # epilogue\n"
 			]
 		in
 			String.concat [
