@@ -2,7 +2,7 @@ let
 	function f(a:int, b:int, c:int, d:int, e:int, f:int, g:int, h:int, i:int, j:int):int = 
 		a*b*c*d*e*f*g*h*i*j
 in
-	if f(1,2,3,4,5,6,7,8,9,10) = 3628800 then print("true") else print("false"); 0
+	print_int(f(1,2,3,4,5,6,7,8,9,10)); 0
 end
 
 /* Argument passing:
