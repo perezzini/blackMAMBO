@@ -1,0 +1,22 @@
+let
+    function f1(a: int) : int =
+    let
+        var inc := 1
+        function f2(a: int) : int =
+        let
+            function f3(a: int) : int =
+            let
+                function f4(a: int) : int = f1(a-1) + inc
+                function f5(a: int) : int = f4(a) + inc
+            in
+                f5(a) + inc
+            end
+        in
+            f3(a) + inc
+        end
+    in
+        if a=0 then 1 else f2(a)
+    end
+in
+    print_int(f1(10)); 0
+end
