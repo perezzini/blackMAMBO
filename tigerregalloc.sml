@@ -623,7 +623,7 @@ struct
 							val _ = print("\nnodeMoves "^u^" = "^(utils.setToString (nodeMoves u) (fn pair => 
 								utils.pairToString pair utils.id utils.id))^"\n")*)
 						in
-							if not(Splayset.member(precolored, v)) (* is this ok? Added; not in original pseudo-code. If we not check this condition, the algorith (may be) would color precolored registers. *)
+							if not(Splayset.member(precolored, v)) (* is this ok? Not in original pseudo-code. If we do not check this condition, the algorithm may color precolored registers. *)
 							then 
 								if Splayset.isEmpty(nodeMoves v) andalso degree_v < k (* if v is a precolored node, degree[v] < k would always holds true *)
 								then 
@@ -686,27 +686,19 @@ struct
 	        			andalso Splayset.isEmpty (!spillWorklist)) do
 	        		(if not(Splayset.isEmpty (!simplifyWorklist)) 
 	        			then 
-	        				(simplify();
-	        				print("\n**simplify() DONE\n");
-	        				printDataStructure "simplifyWorklist")
+	        				simplify()
 	        			else 
 	        				if not(Splayset.isEmpty (!worklistMoves)) 
 	        				then 
-	        					(coalesce();
-	        					print("\n**coalesce() DONE\n");
-	        					printDataStructure "simplifyWorklist")
+	        					coalesce()
 	        				else 
 	        					if not(Splayset.isEmpty (!freezeWorklist)) 
 	        					then 
-	        						(freeze();
-	        						print("\n**freeze() DONE\n");
-	        						printDataStructure "simplifyWorklist") 
+	        						freeze()
 	        					else 
 	        						if not(Splayset.isEmpty (!spillWorklist)) 
 	        						then 
-	        							(selectSpill();
-	        							print("\n*selectSpill() DONE\n");
-	        							printDataStructure "simplifyWorklist")
+	        							selectSpill()
 	        						else 
 	        							())
 
@@ -1014,20 +1006,15 @@ struct
 
 		in
 			livenessAnalysis();
-			print("\n**liveAnalysis() DONE\n");
 			build();
-			print("\n**build() DONE\n");
 			makeWorklist();
-			print("\n**makeWorklist() DONE\n");
 			checkInvariants();
 			repeat();
 			assignColors();
-			print("\n**assignColors() DONE\n");
-			printDataStructure "color";
 			if not(Splayset.isEmpty (!spilledNodes))
 			then 
 				let
-					val _ = print("\n**rewriteProgram() DONE\n")		
+					(*val _ = print("\n**rewriteProgram() DONE\n")*)		
 				in
 					(* perform algorithm all over again with new 
 						altered graph *)
