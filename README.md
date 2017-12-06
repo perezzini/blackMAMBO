@@ -29,7 +29,7 @@ First of all:
 3. Open `Makefile` from blackMAMBO, and update `HOME` path with the path where you installed Moscow ML.
 4. Open a terminal, change directory to blackMAMBO folder, do the following: ```make clean && make depend && make```
 
-Now, let's say you want to compile a Tiger program `program.tig`. The simpler way to carry out this operation is doing the following: ```./tiger program.tig```.
+Now, let's say you want to compile a Tiger program `program.tig`. The simplest way to carry out this operation is by doing the following: ```./tiger program.tig```.
 
 There exist several options available to display information when compiling a Tiger program using blackMAMBO: ```./tiger -option program.tig```, where `option` can be
 
