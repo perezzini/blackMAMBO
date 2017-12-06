@@ -236,7 +236,7 @@ fun main(args) =
 		  in
 			String.concat [
 			  "### Program assembly. x64 architecture; AT&T syntax\n\n",
-			  ".file\t \""^fileName^".c"^"\""^"\n\n",
+			  ".file\t \""^fileName^"\""^"\n\n",
 			  ".data\n",
 			  convertStringFragsToString()^"\n",
 			  ".text"^"\n",
@@ -267,7 +267,7 @@ fun main(args) =
 					()
 
 		(* Execute GCC, and run the input program *)
-		val _ = Process.system("gcc -g -c runtime.c && gcc -g result.s runtime.o -o result && ./result")
+		val _ = Process.system("gcc -g -c runtime.c && gcc -g result.s runtime.o -o result.bin && ./result.bin")
 	in
 		print("\nSuccessful compilation. Errors not found.\n")
 	end	

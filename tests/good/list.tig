@@ -1,0 +1,8 @@
+let
+    type R = {s: string, n: R}
+    var r:= R {s="Hola mundo", n=nil}
+in
+    r.n := r;
+    print(r.n.n.n.n.n.n.n.n.n.n.n.n.n.n.s);
+    0
+end

@@ -1,0 +1,11 @@
+let
+    type arr = array of string
+    type arrarr = array of arr
+    var a := arrarr [10] of arr [10] of "buuu"
+in
+    a[0][0] := "Hola ";
+    a[5][5] := "mundo";
+    print(a[3][0]);
+    print(a[8][5]);
+    0
+end

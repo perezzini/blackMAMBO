@@ -60,6 +60,10 @@ void print(string *s)
     for (i = 0; i < s->length; i++, p++)
 		putchar(*p);
 }
+void print_int(long i)
+{
+	printf("%ld", i);
+}
 void flush()
 {
     fflush(stdout);

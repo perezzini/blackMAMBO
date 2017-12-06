@@ -1,3 +1,6 @@
-(while 1
-do
-  if 1 then print("hey!"); 0)
+let
+	var a:int := 0
+in
+	while a <> 3 do
+		(print_int(a); a:=a+1); 0
+end
