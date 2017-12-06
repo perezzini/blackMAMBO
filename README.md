@@ -2,7 +2,7 @@
 A Tiger compiler, for a **X64 target-machine**, implemented in Standard ML, a "strict, statically typed functional programming language with modular structure".
 
 # About Tiger
-Tiger is a simple language, statically-typed, programming language defined in Andrew W. Appel's book *Modern Compiler Implementation in ML*.
+Tiger is a simple, statically-typed, programming language defined in Andrew W. Appel's book *Modern Compiler Implementation in ML*.
 You can find a fine specification in [Semantic Scholar](https://goo.gl/icf7Np).
 
 # Platform
