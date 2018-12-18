@@ -3,7 +3,7 @@ A Tiger compiler, for a **X64 target-machine**, implemented in Standard ML, a "s
 
 # About Tiger
 Tiger is a simple, statically-typed, programming language defined in Andrew W. Appel's book *Modern Compiler Implementation in ML*.
-You can find a fine specification in [Semantic Scholar](https://goo.gl/icf7Np).
+You can find a fine specification [from NYU](https://cs.nyu.edu/courses/fall13/CSCI-GA.2130-001/tiger-spec.pdf).
 
 # Platform
 Linux
